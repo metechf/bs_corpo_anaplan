@@ -696,8 +696,9 @@ class AnaplanMainApp:
                                     "Qualité": row.get("Product", ""),
                                     "Partenaire Groupe": "HG",
                                     "Pays": pays,
-                                    "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel,
+                                    "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -738,8 +739,9 @@ class AnaplanMainApp:
                                     "Qualité": row.get("Product", ""),
                                     "Partenaire Groupe": "HG",
                                     "Pays": pays,
-                                    "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel,
+                                    "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                     "PRIX FOB": prix_fob_mois,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -748,7 +750,7 @@ class AnaplanMainApp:
                                 })
 
         # === BLOC 2 - Vente Local ===
-        
+
         # CAS 1: Ventes Locales directement depuis Volume + Prix depuis FulfillData
         if "Export_or_Local" in volume_df.columns:
             volume_df_local = volume_df[volume_df["Export_or_Local"] == "LOCAL"].copy()
@@ -835,8 +837,9 @@ class AnaplanMainApp:
                                     "Qualité": row.get("Product", ""),
                                     "Partenaire Groupe": "HG",
                                     "Pays": "Maroc",
-                                    "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel,
+                                    "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -877,8 +880,9 @@ class AnaplanMainApp:
                                     "Qualité": row.get("Product", ""),
                                     "Partenaire Groupe": "HG",
                                     "Pays": "Maroc",
-                                    "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel,
+                                    "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                     "PRIX FOB": prix_fob_mois,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -895,7 +899,13 @@ class AnaplanMainApp:
         destinations_autorisees = ["MP2", "MP1", "MC", "MAP SOLUBLE", "JPH", "Jorf", "JLN", 
                                   "JFC5", "JFC4", "JFC3", "JFC2", "JFC1", "IMACID", "EMAPHOS", 
                                   "OFAS", "TSP Hub", "PMP", "Unite_Co_cristallisation", "MP34"]
-        
+        # TODO TBV avant activation
+        # Filtrer les connexions contenant "VenteLocale"
+        # flow_df = flow_df[flow_df.apply(
+        #     lambda row: 'ventelocale' in str(row.get('Connexion', '')).lower(),
+        #     axis=1
+        # )]
+
         session_price_filtered = session_price_df[session_price_df["Destination"].isin(destinations_autorisees)]
         bloc1_count = len(volume_df_export)
         bloc2_cas1_count = len(volume_df_local)
@@ -946,8 +956,9 @@ class AnaplanMainApp:
                                 "Qualité": product,
                                 "Partenaire Groupe": destination,
                                 "Pays": "Maroc",
-                                "Devise": "USD",
-                                "VOLUME (T)": volume_mensuel,
+                                "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                 "PRIX FOB": prix_fob,
                                 "Prix Fret": "",
                                 "Prix Frais d'approche MP": "",
@@ -957,6 +968,11 @@ class AnaplanMainApp:
         # === BLOC 3 - Consommation de MP ===
         feuille_raw = xls.parse("RawMaterials", header=None)
         used_df = self.extraire_table_par_nom(feuille_raw, "UsedVolume")
+        # TODO must change UsedVolume by Flow table, TBV before activation
+        # Source = Connexions #Flow avec filtre "Port dans Origin"
+        # flow_df = self.extraire_table_par_nom(feuille_connexions, "Flow")
+        # flow_amp = flow_df[flow_df['Origin'].str.contains('Port', case=False, na=False)]
+
         prices_df = self.extraire_table_par_nom(feuille_raw, "Prices")
         
         # Calculer l'ordre pour le Bloc 3 (après Bloc 1 Export + Bloc 2 Local + Flux)
@@ -1027,8 +1043,9 @@ class AnaplanMainApp:
                                         "Qualité": row.get("Product", ""),
                                         "Partenaire Groupe": "HG",
                                         "Pays": "Maroc",
-                                        "Devise": "USD",
-                                        "VOLUME (T)": volume_mensuel,
+                                        "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                        "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                         "PRIX FOB": prix_fob,
                                         "Prix Fret": "",
                                         "Prix Frais d'approche MP": "",
@@ -1075,8 +1092,9 @@ class AnaplanMainApp:
                                     "Qualité": row.get("Product", ""),
                                     "Partenaire Groupe": "HG",
                                     "Pays": "Maroc",
-                                    "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel,
+                                    "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1117,8 +1135,9 @@ class AnaplanMainApp:
                             "Qualité": row.get("Product", ""),
                             "Partenaire Groupe": "HG",
                             "Pays": "Maroc",
-                            "Devise": "USD",
-                            "VOLUME (T)": volume_mensuel,
+                            "Région": row.get("Region", ""),  # NOUVEAU
+"Devise": "USD",
+                            "VOLUME (T)": volume_mensuel * 1000,  # Conversion kt → t
                             "PRIX FOB": prix_fob,
                             "Prix Fret": "",
                             "Prix Frais d'approche MP": "",
@@ -1232,6 +1251,644 @@ class AnaplanMainApp:
                 if sheet_name in writer.sheets:
                     writer.sheets[sheet_name].set_tab_color(color)
         
+        return df_final, output.getvalue()
+
+    def generate_ppv_ventes_mp_v2(self, uploaded_file, exercice: str, date_version):
+        """Génère le DataFrame et l'Excel pour Ventes & MP."""
+        xls = pd.ExcelFile(uploaded_file)
+        annee = pd.to_datetime(date_version).year
+        all_rows = []
+
+        # === BLOC 1 - Vente Export ===
+        sheet_sales_name = self.find_sheet(xls, "sales")
+        sheet_mps_name = self.find_sheet(xls, "multi", "period", "sales")
+        sheet_price_name = self.find_sheet(xls, "price")
+
+        if sheet_sales_name is None or sheet_mps_name is None:
+            st.error("Feuilles concernant les ventes non trouvées dans le fichier.")
+            return pd.DataFrame(), b""
+
+        if sheet_price_name is None:
+            st.error("Feuille Price non trouvée dans le fichier.")
+            return pd.DataFrame(), b""
+
+        feuille_sales = xls.parse(sheet_sales_name, header=None)
+        feuille_mps = xls.parse(sheet_mps_name, header=None)
+        feuille_price = xls.parse(sheet_price_name, header=None)
+        volume_df = self.extraire_table_par_nom(feuille_sales, "Volume")
+        fulfill_df = self.extraire_table_par_nom(feuille_mps, "FulfillData")
+        contract_price_df = self.extraire_table_par_nom(feuille_price, "ContractPrice")
+
+        # Filtrer les données Export pour BLOC 1
+        if "Export_or_Local" in volume_df.columns:
+            volume_df_export = volume_df[volume_df["Export_or_Local"] == "EXPORT"].copy()
+        elif "Export or local" in volume_df.columns:
+            volume_df_export = volume_df[volume_df["Export or local"].str.upper() == "EXPORT"].copy()
+        else:
+            volume_df_export = volume_df.copy()
+
+        # Filtrer FulfillData Export
+        if "Export or local" in fulfill_df.columns:
+            fulfill_df_export = fulfill_df[fulfill_df["Export or local"] == "EXPORT"].copy()
+        else:
+            fulfill_df_export = pd.DataFrame()
+
+        # Ajouter colonnes de tokens pour le matching
+        if not fulfill_df_export.empty and 'Contract' in fulfill_df_export.columns:
+            fulfill_df_export["Contract_tokens"] = fulfill_df_export["Contract"].apply(self.tokenizer_contract)
+        if not volume_df_export.empty and 'Contract' in volume_df_export.columns:
+            volume_df_export["Contract_tokens"] = volume_df_export["Contract"].apply(self.tokenizer_contract)
+
+        for i, row in volume_df_export.iterrows():
+            site_entite = row.get("Entity", "")
+            contract = row.get("Contract", "")
+            volume_tokens = row.get("Contract_tokens", set())
+
+            # Pays via matching par tokens
+            pays = ""
+            if not fulfill_df_export.empty and volume_tokens:
+                pays = self.clean_tuple_string(
+                    self.match_par_tokens(volume_tokens, fulfill_df_export, seuil=6)
+                )
+
+            # Mapping mois
+            month_mapping = {
+                "Juillet": 7, "juillet": 7,
+                "Aout": 8, "août": 8, "aout": 8,
+                "Septembre": 9, "septembre": 9,
+                "Octobre": 10, "octobre": 10,
+                "Novembre": 11, "novembre": 11,
+                "Decembre": 12, "décembre": 12, "decembre": 12
+            }
+
+            volumes_traites = []
+
+            # 1. Traiter colonnes mensuelles directes
+            for col in row.index:
+                if "Volume[" in str(col) and any(month in str(col) for month in month_mapping.keys()):
+                    volume_value = row[col]
+                    if pd.notna(volume_value):
+                        try:
+                            volume_mensuel = float(volume_value) * 1000  # MODIFIÉ: ajout *1000 (KT→T)
+                            mois_num = None
+                            for month_name, month_num in month_mapping.items():
+                                if month_name in str(col):
+                                    mois_num = month_num
+                                    break
+
+                            if mois_num:
+                                prix_fob = self.get_prix_from_contract_price(contract, contract_price_df, mois_num)
+                                volumes_traites.append(mois_num)
+                                all_rows.append({
+                                    "Bloc": "Bloc 1",
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois_num,
+                                    "Type de transaction": "Vente Export",
+                                    "Site/Entité": site_entite,
+                                    "Qualité": row.get("Product", ""),
+                                    "Partenaire Groupe": "HG",
+                                    "Pays": pays,
+                                    "Region": row.get("Region", ""),
+                                    "Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                                    "PRIX FOB": prix_fob,
+                                    "Prix Fret": "",
+                                    "Prix Frais d'approche MP": "",
+                                    "TypeProduct": row.get("TypeProduct", ""),
+                                    "_ordre_original": i
+                                })
+                        except (ValueError, TypeError):
+                            pass
+
+            # 2. Traiter trimestres pour mois non couverts
+            for q in ["Q1", "Q2", "Q3", "Q4"]:
+                volume_colonne = f"Volume[{q}]"
+                if volume_colonne in row:
+                    volume_value = row[volume_colonne]
+                    if pd.notna(volume_value):
+                        try:
+                            volume_mensuel = float(volume_value) * 1000 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                        except (ValueError, TypeError):
+                            continue
+
+                        months = self.quarter_to_months[q]
+                        for mois in months:
+                            if mois not in volumes_traites:
+                                prix_fob_mois = self.get_prix_from_contract_price(contract, contract_price_df, mois)
+                                all_rows.append({
+                                    "Bloc": "Bloc 1",
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois,
+                                    "Type de transaction": "Vente Export",
+                                    "Site/Entité": site_entite,
+                                    "Qualité": row.get("Product", ""),
+                                    "Partenaire Groupe": "HG",
+                                    "Pays": pays,
+                                    "Region": row.get("Region", ""),
+                                    "Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                                    "PRIX FOB": prix_fob_mois,
+                                    "Prix Fret": "",
+                                    "Prix Frais d'approche MP": "",
+                                    "TypeProduct": row.get("TypeProduct", ""),
+                                    "_ordre_original": i
+                                })
+
+        # === BLOC 2 - Vente Local ===
+
+        # CAS 1: Ventes Locales depuis Volume
+        if "Export_or_Local" in volume_df.columns:
+            volume_df_local = volume_df[volume_df["Export_or_Local"] == "LOCAL"].copy()
+        elif "Export or local" in volume_df.columns:
+            volume_df_local = volume_df[volume_df["Export or local"].str.upper() == "LOCAL"].copy()
+        else:
+            volume_df_local = pd.DataFrame()
+
+        if not volume_df_local.empty and 'Contract' in volume_df_local.columns:
+            volume_df_local["Contract_tokens"] = volume_df_local["Contract"].apply(self.tokenizer_contract)
+
+        # if "Export or local" in fulfill_df.columns:
+        #     fulfill_df_local = fulfill_df[fulfill_df["Export or local"] == "LOCAL"].copy()
+        #     if not fulfill_df_local.empty and 'Contract' in fulfill_df_local.columns:
+        #         fulfill_df_local["Contract_tokens"] = fulfill_df_local["Contract"].apply(self.tokenizer_contract)
+        # else:
+        #     fulfill_df_local = pd.DataFrame()
+
+        max_export_order = len(volume_df_export)
+
+        for i, row in volume_df_local.iterrows():
+            site_entite = row.get("Entity", "")
+            contract = row.get("Contract", "")
+            volume_tokens = row.get("Contract_tokens", set())
+
+            month_mapping = {
+                "Juillet": 7, "juillet": 7,
+                "Aout": 8, "août": 8, "aout": 8,
+                "Septembre": 9, "septembre": 9,
+                "Octobre": 10, "octobre": 10,
+                "Novembre": 11, "novembre": 11,
+                "Decembre": 12, "décembre": 12, "decembre": 12
+            }
+
+            volumes_traites = []
+
+            # 1. Traiter colonnes mensuelles directes
+            for col in row.index:
+                if "Volume[" in str(col) and any(month in str(col) for month in month_mapping.keys()):
+                    volume_value = row[col]
+                    if pd.notna(volume_value):
+                        try:
+                            volume_mensuel = float(volume_value) * 1000  # MODIFIÉ: ajout *1000 (KT→T)
+                            mois_num = None
+                            for month_name, month_num in month_mapping.items():
+                                if month_name in str(col):
+                                    mois_num = month_num
+                                    break
+
+                            if mois_num:
+                                prix_fob = self.get_prix_from_contract_price(contract, contract_price_df, mois_num)
+                                volumes_traites.append(mois_num)
+                                all_rows.append({
+                                    "Bloc": "Bloc 2",
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois_num,
+                                    "Type de transaction": "Vente Locale",
+                                    "Site/Entité": site_entite,
+                                    "Qualité": row.get("Product", ""),
+                                    "Partenaire Groupe": "HG",
+                                    "Pays": "Maroc",
+                                    "Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                                    "PRIX FOB": prix_fob,
+                                    "Prix Fret": "",
+                                    "Prix Frais d'approche MP": "",
+                                    "TypeProduct": row.get("TypeProduct", ""),
+                                    "_ordre_original": max_export_order + i
+                                })
+                        except (ValueError, TypeError):
+                            pass
+
+            # 2. Traiter trimestres
+            for q in ["Q1", "Q2", "Q3", "Q4"]:
+                volume_colonne = f"Volume[{q}]"
+                if volume_colonne in row:
+                    volume_value = row[volume_colonne]
+                    if pd.notna(volume_value):
+                        try:
+                            volume_mensuel = float(volume_value) * 1000 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                        except (ValueError, TypeError):
+                            continue
+
+                        months = self.quarter_to_months[q]
+                        for mois in months:
+                            if mois not in volumes_traites:
+                                prix_fob_mois = self.get_prix_from_contract_price(contract, contract_price_df, mois)
+                                all_rows.append({
+                                    "Bloc": "Bloc 2",
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois,
+                                    "Type de transaction": "Vente Locale",
+                                    "Site/Entité": site_entite,
+                                    "Qualité": row.get("Product", ""),
+                                    "Partenaire Groupe": "HG",
+                                    "Pays": "Maroc",
+                                    "Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                                    "PRIX FOB": prix_fob_mois,
+                                    "Prix Fret": "",
+                                    "Prix Frais d'approche MP": "",
+                                    "TypeProduct": row.get("TypeProduct", ""),
+                                    "_ordre_original": max_export_order + i
+                                })
+
+        # CAS 2: Flux Internes depuis Connexions
+        feuille_connexions = xls.parse("Connexions", header=None)
+        feuille_price = xls.parse("Price", header=None)
+        flow_df = self.extraire_table_par_nom(feuille_connexions, "Flow")
+        # filter out with VenteLocale Connexion
+        flow_df = flow_df[flow_df['Connexion'].str.contains('VenteLocale', case=False, na=False)]
+        session_price_df = self.extraire_table_par_nom(feuille_price, "SessionPrice")
+
+        session_price_filtered = session_price_df[session_price_df['Connexion'].str.contains('VenteLocale', case=False, na=False)]
+
+        bloc1_count = len(volume_df_export)
+        bloc2_cas1_count = len(volume_df_local)
+
+        for i, row in flow_df.iterrows():
+            connexion = row.get("Connexion", "")
+            origin = row.get("Origin", "")
+            destination = row.get("Destination", "")
+            product = row.get("Product", "")
+
+            # Mapping mois
+            month_mapping = {
+                "Juillet": 7, "juillet": 7,
+                "Aout": 8, "août": 8, "aout": 8,
+                "Septembre": 9, "septembre": 9,
+                "Octobre": 10, "octobre": 10,
+                "Novembre": 11, "novembre": 11,
+                "Decembre": 12, "décembre": 12, "decembre": 12
+            }
+
+            volumes_traites = []
+
+            # 1. Colonnes mensuelles
+            for col in row.index:
+                if "Flow[" in str(col) and any(month in str(col) for month in month_mapping.keys()):
+                    volume_value = row[col]
+                    if pd.notna(volume_value):
+                        try:
+                            volume_mensuel = float(volume_value) * 1000
+                            mois_num = None
+                            for month_name, month_num in month_mapping.items():
+                                if month_name in str(col):
+                                    mois_num = month_num
+                                    break
+
+                            if mois_num:
+                                volumes_traites.append(mois_num)
+
+                                # Prix mensuel
+                                prix_fob = ""
+                                prix_col_mois = f"Price[{[k for k, v in month_mapping.items() if v == mois_num][0]}]"
+                                matching_prices = session_price_filtered[
+                                    session_price_filtered["Connexion"] == connexion]
+                                if not matching_prices.empty and prix_col_mois in matching_prices.columns:
+                                    prix_value = matching_prices.iloc[0][prix_col_mois]
+                                    if pd.notna(prix_value) and float(prix_value) != 0:
+                                        try:
+                                            prix_fob = float(prix_value)
+                                        except:
+                                            pass
+
+                                all_rows.append({
+                                    "Bloc": "Bloc 2",
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois_num,
+                                    "Type de transaction": "Vente Locale",
+                                    "Site/Entité": origin,
+                                    "Qualité": product,
+                                    "Partenaire Groupe": destination,
+                                    "Pays": "Maroc",
+                                    "Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel,
+                                    "PRIX FOB": prix_fob,
+                                    "Prix Fret": "",
+                                    "Prix Frais d'approche MP": "",
+                                    "_ordre_original": bloc1_count + bloc2_cas1_count + i
+                                })
+                        except (ValueError, TypeError):
+                            pass
+
+            # 2. Trimestres (pour mois non traités)
+            for q in ["Q1", "Q2", "Q3", "Q4"]:
+                colname = f"Flow[{q}]"
+                if colname in row and pd.notna(row[colname]):
+                    try:
+                        volume_mensuel = float(row[colname]) * 1000 / 3
+                    except:
+                        continue
+
+                    prix_fob = ""
+                    prix_colonne = f"Price[{q}]"
+                    matching_prices = session_price_filtered[session_price_filtered["Connexion"] == connexion]
+                    if not matching_prices.empty and prix_colonne in matching_prices.columns:
+                        prix_value = matching_prices.iloc[0][prix_colonne]
+                        if pd.notna(prix_value) and float(prix_value) != 0:
+                            try:
+                                prix_fob = float(prix_value)
+                            except:
+                                pass
+
+                    months = self.quarter_to_months[q]
+                    for mois in months:
+                        if mois not in volumes_traites:
+                            all_rows.append({
+                                "Bloc": "Bloc 2",
+                                "Exercice": exercice,
+                                "Date de la Version": str(date_version),
+                                "Année": annee,
+                                "Mois": mois,
+                                "Type de transaction": "Vente Locale",
+                                "Site/Entité": origin,
+                                "Qualité": product,
+                                "Partenaire Groupe": destination,
+                                "Pays": "Maroc",
+                                "Devise": "USD",
+                                "VOLUME (T)": volume_mensuel,
+                                "PRIX FOB": prix_fob,
+                                "Prix Fret": "",
+                                "Prix Frais d'approche MP": "",
+                                "_ordre_original": bloc1_count + bloc2_cas1_count + i
+                            })
+
+        # === BLOC 3 - Consommation de MP ===
+        # MODIFIÉ: Changement de source RawMaterials#UsedVolume → Connexions#Flow
+        feuille_connexions = xls.parse("Connexions", header=None)
+        feuille_raw = xls.parse("RawMaterials", header=None)  # Pour Prices uniquement
+        flow_df_amp = self.extraire_table_par_nom(feuille_connexions, "Flow")  # MODIFIÉ: source Flow
+        prices_df = self.extraire_table_par_nom(feuille_raw, "Prices")
+
+        # MODIFIÉ: Filtre Port dans Origin
+        flow_amp = flow_df_amp[flow_df_amp['Origin'].str.contains('Port', case=False, na=False)]
+
+        # bloc2_total_count = len(volume_df_local) + len(flow_df[flow_df["Destination"].isin(destinations_autorisees)])
+        bloc2_total_count = len(volume_df_local) + len(flow_df)
+        max_bloc2_order = len(volume_df_export) + bloc2_total_count
+
+        for i, row in flow_amp.iterrows():  # MODIFIÉ: flow_amp au lieu de used_df
+            # MODIFIÉ: Détection colonnes Flow[Q1/Q2/Q3/Q4] au lieu de Volume[...]
+            has_quarterly_or_monthly_data = any(f"Flow[{q}]" in row for q in ["Q1", "Q2", "Q3", "Q4"]) or any(f'Flow[{month.capitalize()}]' in row for month in self.month_name_to_num.keys())
+
+            if has_quarterly_or_monthly_data:
+                month_mapping = {
+                    "Juillet": 7, "juillet": 7,
+                    "Aout": 8, "août": 8, "aout": 8,
+                    "Septembre": 9, "septembre": 9,
+                    "Octobre": 10, "octobre": 10,
+                    "Novembre": 11, "novembre": 11,
+                    "Decembre": 12, "décembre": 12, "decembre": 12
+                }
+
+                volumes_traites = []
+
+                # 1. Traiter colonnes mensuelles
+                for col in row.index:
+                    # MODIFIÉ: Flow[ au lieu de Volume[
+                    if "Flow[" in str(col) and any(month in str(col) for month in month_mapping.keys()):
+                        volume_value = row[col]
+                        if pd.notna(volume_value):
+                            try:
+                                volume_mensuel = float(volume_value) * 1000  # MODIFIÉ: ajout *1000 (KT→T)
+                                mois_num = None
+                                for month_name, month_num in month_mapping.items():
+                                    if month_name in str(col):
+                                        mois_num = month_num
+                                        break
+
+                                if mois_num:
+                                    volumes_traites.append(mois_num)
+
+                                    # Prix depuis #Prices
+                                    prix_fob = ""
+                                    product = row.get("Product", "")
+                                    if not prices_df.empty and product:
+                                        matching_prices = prices_df[prices_df.get("Product", "") == product]
+                                        if not matching_prices.empty:
+                                            month_names = ["Juillet", "Aout", "Septembre", "Q4"]
+                                            for mn in month_names:
+                                                prix_col = f"Price[{mn}]"
+                                                if prix_col in matching_prices.columns:
+                                                    prix_value = matching_prices.iloc[0][prix_col]
+                                                    if pd.notna(prix_value) and float(prix_value) != 0:
+                                                        try:
+                                                            prix_fob = float(prix_value)
+                                                            break
+                                                        except:
+                                                            pass
+
+                                    all_rows.append({
+                                        "Bloc": "Bloc 3",
+                                        "Exercice": exercice,
+                                        "Date de la Version": str(date_version),
+                                        "Année": annee,
+                                        "Mois": mois_num,
+                                        "Type de transaction": "Achat de MP",
+                                        "Site/Entité": row.get("Destination", ""),
+                                        # MODIFIÉ: Destination au lieu de Facility
+                                        "Qualité": row.get("Product", ""),
+                                        "Partenaire Groupe": "HG",
+                                        "Pays": "Maroc",
+                                        "Devise": "USD",
+                                        "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                                        "PRIX FOB": prix_fob,
+                                        "Prix Fret": "",
+                                        "Prix Frais d'approche MP": "",
+                                        "_ordre_original": max_bloc2_order + i
+                                    })
+                            except (ValueError, TypeError):
+                                pass
+
+                # 2. Logique trimestrielle
+                for q in ["Q1", "Q2", "Q3", "Q4"]:
+                    colname = f"Flow[{q}]"  # MODIFIÉ: Flow[ au lieu de Volume[
+                    if colname in row and pd.notna(row[colname]):
+                        try:
+                            volume_mensuel = float(row[colname]) * 1000 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                        except:
+                            continue
+
+                        # Prix depuis #Prices
+                        prix_fob = ""
+                        product = row.get("Product", "")
+                        if not prices_df.empty and product:
+                            prix_colonne = f"Price[{q}]"
+                            matching_prices = prices_df[prices_df.get("Product", "") == product]
+                            if not matching_prices.empty and prix_colonne in matching_prices.columns:
+                                prix_value = matching_prices.iloc[0][prix_colonne]
+                                if pd.notna(prix_value) and float(prix_value) != 0:
+                                    try:
+                                        prix_fob = float(prix_value)
+                                    except:
+                                        prix_fob = ""
+
+                        months = self.quarter_to_months[q]
+                        for mois in months:
+                            if mois not in volumes_traites:
+                                all_rows.append({
+                                    "Bloc": "Bloc 3",
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois,
+                                    "Type de transaction": "Achat de MP",
+                                    "Site/Entité": row.get("Destination", ""),
+                                    # MODIFIÉ: Destination au lieu de Facility
+                                    "Qualité": row.get("Product", ""),
+                                    "Partenaire Groupe": "HG",
+                                    "Pays": "Maroc",
+                                    "Devise": "USD",
+                                    "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                                    "PRIX FOB": prix_fob,
+                                    "Prix Fret": "",
+                                    "Prix Frais d'approche MP": "",
+                                    "_ordre_original": max_bloc2_order + i
+                                })
+            else:
+                # Logique simple si pas de colonnes trimestrielles
+                volume_simple = row.get("Flow", 0)  # MODIFIÉ: Flow au lieu de Volume
+                if pd.notna(volume_simple):
+                    try:
+                        volume_mensuel = float(volume_simple) * 1000 / 12  # MODIFIÉ: ajout *1000 (KT→T)
+                    except:
+                        volume_mensuel = ""
+
+                    # Prix depuis #Prices
+                    prix_fob = ""
+                    product = row.get("Product", "")
+                    if not prices_df.empty and product:
+                        matching_prices = prices_df[prices_df.get("Product", "") == product]
+                        if not matching_prices.empty and "Price" in matching_prices.columns:
+                            prix_value = matching_prices.iloc[0]["Price"]
+                            if pd.notna(prix_value) and float(prix_value) != 0:
+                                try:
+                                    prix_fob = float(prix_value)
+                                except:
+                                    prix_fob = ""
+
+                    for mois in range(1, 13):
+                        all_rows.append({
+                            "Bloc": "Bloc 3",
+                            "Exercice": exercice,
+                            "Date de la Version": str(date_version),
+                            "Année": annee,
+                            "Mois": mois,
+                            "Type de transaction": "Achat de MP",
+                            "Site/Entité": row.get("Destination", ""),  # MODIFIÉ: Destination au lieu de Facility
+                            "Qualité": row.get("Product", ""),
+                            "Partenaire Groupe": "HG",
+                            "Pays": "Maroc",
+                            "Devise": "USD",
+                            "VOLUME (T)": volume_mensuel,  # Déjà *1000
+                            "PRIX FOB": prix_fob,
+                            "Prix Fret": "",
+                            "Prix Frais d'approche MP": "",
+                            "_ordre_original": max_bloc2_order + i
+                        })
+
+        if not all_rows:
+            st.error("Aucune donnée trouvée pour Ventes & MP.")
+            return pd.DataFrame(), b""
+
+        # Tri et finalisation
+        df_final = pd.DataFrame(all_rows)
+
+        pays_order = fulfill_df["Country"].unique().tolist() if "Country" in fulfill_df.columns else []
+        if "Maroc" not in pays_order:
+            pays_order.insert(0, "Maroc")
+
+        pays_order_map = {pays: i for i, pays in enumerate(pays_order)}
+        df_final["_ordre_tri"] = df_final["Pays"].map(lambda x: pays_order_map.get(x, 9999))
+        df_final["_ordre_export"] = df_final["Type de transaction"].map(
+            lambda x: 0 if "export" in str(x).lower() else 1
+        )
+
+        def prix_pour_tri(prix_fob):
+            if pd.isna(prix_fob) or prix_fob == "":
+                return float('inf')
+            try:
+                return float(prix_fob)
+            except:
+                return float('inf')
+
+        df_final["_ordre_prix"] = df_final["PRIX FOB"].apply(prix_pour_tri)
+
+        df_final = df_final.sort_values([
+            "Bloc", "_ordre_tri", "_ordre_export", "_ordre_prix", "Mois"
+        ]).reset_index(drop=True)
+
+        df_final = df_final.drop(["_ordre_tri", "_ordre_export", "_ordre_original", "_ordre_prix"], axis=1)
+        df_final.insert(0, "#ID", [f"#{i + 1}" for i in range(len(df_final))])
+
+        # Export Excel avec tables sources
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df_final.to_excel(writer, index=False, sheet_name="Fichier plat Ventes et MP")
+            workbook = writer.book
+            worksheet = writer.sheets["Fichier plat Ventes et MP"]
+            format_bloc1 = workbook.add_format({"bg_color": "#DCE6F1"})
+            format_bloc2 = workbook.add_format({"bg_color": "#E2EFDA"})
+            format_bloc3 = workbook.add_format({"bg_color": "#FFF2CC"})
+            for row_idx, bloc in enumerate(df_final["Bloc"], start=1):
+                fmt = format_bloc1 if bloc == "Bloc 1" else format_bloc2 if bloc == "Bloc 2" else format_bloc3
+                worksheet.set_row(row_idx, cell_format=fmt)
+
+            # Tables sources
+            if not volume_df_export.empty:
+                volume_df_export.to_excel(writer, index=False, sheet_name="Volume Export")
+            if not volume_df_local.empty:
+                volume_df_local.to_excel(writer, index=False, sheet_name="Volume Local")
+            if not fulfill_df_export.empty:
+                fulfill_df_export.to_excel(writer, index=False, sheet_name="FulfillData Export")
+            # if not fulfill_df_local.empty:
+            #     fulfill_df_local.to_excel(writer, index=False, sheet_name="FulfillData Local")
+            if not volume_df.empty:
+                volume_df.to_excel(writer, index=False, sheet_name="Volume")
+            if not flow_df.empty:
+                flow_df.to_excel(writer, index=False, sheet_name="Flow")
+            if not session_price_df.empty:
+                session_price_df.to_excel(writer, index=False, sheet_name="SessionPrice")
+            if not flow_amp.empty:  # MODIFIÉ: Ajout table Flow AMP filtrée
+                flow_amp.to_excel(writer, index=False, sheet_name="Flow AMP (Port)")
+            if not prices_df.empty:
+                prices_df.to_excel(writer, index=False, sheet_name="Prices")
+
+            # Coloration onglets
+            tab_color_map = {
+                "Volume Export": "#DCE6F1",
+                "Volume Local": "#DCE6F1",
+                "FulfillData Export": "#DCE6F1",
+                "FulfillData Local": "#DCE6F1",
+                "Volume": "#DCE6F1",
+                "Flow": "#E2EFDA",
+                "SessionPrice": "#E2EFDA",
+                "Flow AMP (Port)": "#FFF2CC",  # MODIFIÉ: Nouvel onglet
+                "Prices": "#FFF2CC",
+            }
+            for sheet_name, color in tab_color_map.items():
+                if sheet_name in writer.sheets:
+                    writer.sheets[sheet_name].set_tab_color(color)
+
         return df_final, output.getvalue()
 
     # ---------------------------------------------------------------------------
@@ -1535,6 +2192,155 @@ class AnaplanMainApp:
         
         return df_final, output.getvalue()
 
+    def generate_ratios_v2(self, ratios_file, summary_file, exercice: str, date_version):
+        """Génère les ratios matières avec moyenne simple + volumes."""
+
+        # 1) Lecture fichier Ratios PPV
+        xls = pd.ExcelFile(ratios_file)
+        blocks_needed = {"OIJ-Treatment_Matrix": "OIJ", "OIS-Treatment_Matrix": "OIS"}
+        all_rows = []
+
+        for sheet, bloc in blocks_needed.items():
+            if sheet not in xls.sheet_names:
+                continue
+            df = self.parse_treatment_sheet(xls, sheet, bloc)
+            if len(df):
+                all_rows.append(df)
+
+        if not all_rows:
+            st.error("Aucune donnée trouvée pour Ratios Matières.")
+            return pd.DataFrame(), b""
+
+        df_total = pd.concat(all_rows, ignore_index=True)
+
+        # 2) Récupération volumes produits
+        from collections import defaultdict
+        import os
+        volume_par_produit = defaultdict(float)
+
+        # ppv_flat_file = "fichier_ppv_production.xlsx"
+        # if os.path.exists(ppv_flat_file):
+        #     try:
+        #         xls_ppv = pd.ExcelFile(ppv_flat_file)
+        #         sheet_ppv = next((s for s in xls_ppv.sheet_names if "ppv production" in s.lower()),
+        #                          xls_ppv.sheet_names[0])
+        #         df_ppv = pd.read_excel(ppv_flat_file, sheet_name=sheet_ppv, dtype=str, keep_default_na=False)
+        #         df_ppv = df_ppv[df_ppv.get("Opération", "") == "Traitements Chimiques"].copy()
+        #         if not df_ppv.empty and "VOLUME (T)" in df_ppv.columns:
+        #             df_ppv["VOLUME (T)"] = pd.to_numeric(df_ppv["VOLUME (T)"], errors="coerce").fillna(0)
+        #             grouped = df_ppv.groupby("Qualité")["VOLUME (T)"].sum()
+        #             for prod, vol in grouped.items():
+        #                 volume_par_produit[str(prod).strip().upper()] += vol
+        #     except Exception as e:
+        #         print(f"⚠️ Erreur lecture PPV Production : {e}")
+        #
+        # # Volumes ventes
+        # ventes_flat_file = "fichier_ventes_mp.xlsx"
+        # allowed_typeprod = {"Fertilizers", "Fertilizers W", "MarketableAcids"}
+        # if os.path.exists(ventes_flat_file):
+        #     try:
+        #         xls_ventes = pd.ExcelFile(ventes_flat_file)
+        #         sheet_vplat = next((s for s in xls_ventes.sheet_names if "fichier plat ventes" in s.lower()),
+        #                            xls_ventes.sheet_names[0])
+        #         df_vplat = pd.read_excel(ventes_flat_file, sheet_name=sheet_vplat, dtype=str, keep_default_na=False)
+        #         df_vplat = df_vplat[(df_vplat.get("Bloc", "") == "Bloc 1") & (
+        #             df_vplat.get("TypeProduct", "").isin(allowed_typeprod))].copy()
+        #         if not df_vplat.empty and "VOLUME (T)" in df_vplat.columns:
+        #             df_vplat["VOLUME (T)"] = pd.to_numeric(df_vplat["VOLUME (T)"], errors="coerce").fillna(0)
+        #             grouped_v = df_vplat.groupby("Qualité")["VOLUME (T)"].sum()
+        #             for prod, vol in grouped_v.items():
+        #                 volume_par_produit[str(prod).strip().upper()] += vol
+        #     except Exception as e:
+        #         print(f"⚠️ Erreur lecture Ventes : {e}")
+        #
+        # # Fallback SUMMARY
+        # if not volume_par_produit and summary_file is not None:
+        #     try:
+        #         xls_sum = pd.ExcelFile(summary_file)
+        #         physical_sheet = next(
+        #             (s for s in xls_sum.sheet_names if "physical" in s.lower() or "physique" in s.lower()), None)
+        #         if physical_sheet:
+        #             physical_df = self.extraire_table_par_nom(xls_sum.parse(physical_sheet, header=None),
+        #                                                       "VolumeOutputProduct")
+        #             for _, row in physical_df.iterrows():
+        #                 prod = str(row.get("Output", "")).strip().upper()
+        #                 for q in ["Q1", "Q2", "Q3", "Q4"]:
+        #                     colname = f"VolumeOutputProduct[{q}]"
+        #                     if colname in row and pd.notna(row[colname]):
+        #                         try:
+        #                             volume_par_produit[prod] += float(row[colname])
+        #                         except:
+        #                             pass
+        #     except Exception as e:
+        #         print(f"⚠️ Erreur fallback SUMMARY : {e}")
+
+        def _norm_prod(val):
+            return str(val).strip().upper() if pd.notna(val) else ""
+
+        # Attribution volumes
+        # df_total["Volume Produit (T)"] = df_total["Output"].apply(lambda p: volume_par_produit.get(_norm_prod(p), 0))
+
+        # 3) Calcul ratio moyen simple (NON pondéré)
+        # TODO TBC if we should remove the Bloc (OIJ/OIS) or not
+        group_cols = ["Bloc", "Output", "Type Consommation Spécifique"]
+        # group_cols = ["Output", "Type Consommation Spécifique"]
+        ratio_moyen_map = df_total.groupby(group_cols)["Ratio"].mean().to_dict()
+
+        df_total["Ratio Moyen"] = df_total.apply(
+            lambda r: ratio_moyen_map.get((r["Bloc"], r["Output"], r["Type Consommation Spécifique"]), r["Ratio"]),
+            axis=1
+        )
+
+        # 4) Assemblage final
+        annee_series = df_total.get("Budget Year", pd.Series([pd.to_datetime(date_version).year] * len(df_total)))
+
+        df_final = pd.DataFrame({
+            "#ID": [f"#{i + 1}" for i in range(len(df_total))],
+            "Bloc": df_total["Bloc"],
+            "Exercice": exercice,
+            "Date de la Version": str(date_version),
+            "Année": annee_series,
+            "Site/Entité": df_total.get("Facility", df_total.get("Site/Entité", "")),
+            'Treatment': df_total["Treatment"],
+            'Flow': df_total["Flow"],
+            "Qualité": df_total["Output"],
+            "Type Consommation Spécifique": df_total["Type Consommation Spécifique"],
+            "Ratio": df_total["Ratio"],
+            "Ratio Moyen": df_total["Ratio Moyen"]
+        })
+
+        df_final = df_final.drop_duplicates(
+            subset=["Site/Entité", 'Treatment', 'Flow', "Qualité", "Type Consommation Spécifique"]
+        ).reset_index(drop=True)
+
+        # 5) Export Excel
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df_final.to_excel(writer, index=False, sheet_name="Fichier Plat Ratios")
+            workbook = writer.book
+            worksheet = writer.sheets["Fichier Plat Ratios"]
+            format_oij = workbook.add_format({"bg_color": "#DCE6F1"})
+            format_ois = workbook.add_format({"bg_color": "#E2EFDA"})
+
+            for row_idx, bloc in enumerate(df_final["Bloc"], start=1):
+                worksheet.set_row(row_idx, cell_format=format_oij if bloc == "OIJ" else format_ois)
+
+            for sheet, bloc in blocks_needed.items():
+                if sheet in xls.sheet_names:
+                    raw_sheet_data = xls.parse(sheet, header=None)
+                    if not raw_sheet_data.empty:
+                        sheet_name = f"{bloc} Treatment Matrix"
+                        raw_sheet_data.to_excel(writer, index=False, sheet_name=sheet_name, header=False)
+
+            ratio_tab_colors = {
+                "OIJ Treatment Matrix": "#DCE6F1",
+                "OIS Treatment Matrix": "#E2EFDA",
+            }
+            for sheet_name, color in ratio_tab_colors.items():
+                if sheet_name in writer.sheets:
+                    writer.sheets[sheet_name].set_tab_color(color)
+
+        return df_final, output.getvalue()
     # ---------------------------------------------------------------------------
     # Interface principale avec onglets
     # ---------------------------------------------------------------------------
@@ -2078,7 +2884,7 @@ class AnaplanMainApp:
                     status_text.text("💰 Génération Ventes & MP...")
                     progress_bar.progress(0.5)
                     try:
-                        ventes_df, ventes_bytes = self.generate_ppv_ventes_mp(summary_file, exercice, date_version)
+                        ventes_df, ventes_bytes = self.generate_ppv_ventes_mp_v2(summary_file, exercice, date_version)
                         if len(ventes_df):
                             all_files["fichier_ventes_mp.xlsx"] = ventes_bytes
                     except Exception as e:
@@ -2088,7 +2894,7 @@ class AnaplanMainApp:
                     status_text.text("⚗️ Génération Ratios Matières...")
                     progress_bar.progress(0.8)
                     try:
-                        ratios_df, ratios_bytes = self.generate_ratios(ppv_file, summary_file, exercice, date_version)
+                        ratios_df, ratios_bytes = self.generate_ratios_v2(ppv_file, summary_file, exercice, date_version)
                         if len(ratios_df):
                             all_files["fichier_ratios_matieres.xlsx"] = ratios_bytes
                     except Exception as e:
@@ -2230,7 +3036,7 @@ class AnaplanMainApp:
                             
                             # Ventes & MP
                             try:
-                                ventes_df, ventes_bytes = self.generate_ppv_ventes_mp(summary_file, exercice, date_version)
+                                ventes_df, ventes_bytes = self.generate_ppv_ventes_mp_v2(summary_file, exercice, date_version)
                                 if len(ventes_df):
                                     excel_filename = "fichier_ventes_mp.xlsx"
                                     with open(excel_filename, 'wb') as f:
@@ -2241,7 +3047,7 @@ class AnaplanMainApp:
                             
                             # Ratios Matières
                             try:
-                                ratios_df, ratios_bytes = self.generate_ratios(ppv_file, summary_file, exercice, date_version)
+                                ratios_df, ratios_bytes = self.generate_ratios_v2(ppv_file, summary_file, exercice, date_version)
                                 if len(ratios_df):
                                     excel_filename = "fichier_ratios_matieres.xlsx"
                                     with open(excel_filename, 'wb') as f:
