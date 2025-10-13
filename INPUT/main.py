@@ -3268,7 +3268,7 @@ class AnaplanMainApp:
                     status_text.text("📊 Génération PPV Production...")
                     progress_bar.progress(0.2)
                     try:
-                        prod_df, prod_bytes = self.generate_ppv_production_v2(summary_file, exercice, date_version)
+                        prod_df, prod_bytes = self.generate_ppv_production_v3(ppv_file, summary_file, exercice, date_version)
                         if len(prod_df):
                             all_files["fichier_ppv_production.xlsx"] = prod_bytes
                     except Exception as e:
@@ -3419,7 +3419,7 @@ class AnaplanMainApp:
                             
                             # PPV Production
                             try:
-                                prod_df, prod_bytes = self.generate_ppv_production_v2(summary_file, exercice, date_version)
+                                prod_df, prod_bytes = self.generate_ppv_production_v3(ppv_file, summary_file, exercice, date_version)
                                 if len(prod_df):
                                     excel_filename = "fichier_ppv_production.xlsx"
                                     with open(excel_filename, 'wb') as f:
@@ -3651,7 +3651,7 @@ class AnaplanMainApp:
                 "Partenaire Groupe": "",
                 "Type Operation": operation_label,
                 "Operation": row.get('Treatment', ''),
-                "VOLUME (T)": vol,
+                "VOLUME (T)": vol * 1000, # Convertir en t
             })
 
         seen_months = set(monthly_volumes.keys())
@@ -3672,7 +3672,7 @@ class AnaplanMainApp:
                     "Partenaire Groupe": "",
                     "Type Operation": operation_label,
                     "Operation": row.get('Treatment', ''),
-                    "VOLUME (T)": per_month,
+                    "VOLUME (T)": per_month * 1000, # Convertir en t
                 })
 
         return rows
