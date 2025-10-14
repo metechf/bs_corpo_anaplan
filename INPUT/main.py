@@ -902,6 +902,630 @@ class AnaplanMainApp:
 
         return df_final, output.getvalue()
 
+    def generate_ppv_production_v4(self, ppv_file, uploaded_file, input_file, exercice: str, date_version):
+        """Génère le DataFrame et l'Excel pour PPV Production."""
+        xls = pd.ExcelFile(uploaded_file)
+        xls_ppv = pd.ExcelFile(ppv_file)
+        xls_input = pd.ExcelFile(input_file)
+        annee = pd.to_datetime(date_version).year
+        all_rows = []
+
+        # Extraction ----------------------------------------------------------------
+        # NOUVELLE LOGIQUE : Lire depuis OIK, OIB, OIG
+        extraction_sheets = ["OIK", "OIB", "OIG"]
+        extraction_data_list = []
+
+        for sheet_name in extraction_sheets:
+            if sheet_name not in xls_ppv.sheet_names:
+                print(f"⚠️ Feuille {sheet_name} non trouvée, ignorée")
+                continue
+
+            try:
+                # Lire la feuille brute
+                raw_sheet = xls_ppv.parse(sheet_name, header=None)
+
+                # 1. NOUVEAU : Trouver la ligne avec "Volumes extraits" pour identifier les colonnes de périodes
+                periode_row_idx = None
+                periode_columns = {}  # {colonne_index: nom_periode}
+
+                for idx, row in raw_sheet.iterrows():
+                    # Chercher "Volumes extraits (tonnages equivalents SM)"
+                    if any("volumes extraits" in str(cell).lower() and "tonnages" in str(cell).lower()
+                           for cell in row if pd.notna(cell)):
+                        # La ligne suivante ou +1/+2 lignes contient les périodes
+                        # Vérifier les 3 prochaines lignes
+                        for offset in range(1, 4):
+                            if idx + offset < len(raw_sheet):
+                                potential_periode_row = raw_sheet.iloc[idx + offset]
+                                # Vérifier si cette ligne contient des noms de mois ou trimestres
+                                has_periode = any(
+                                    str(cell).lower().strip() in [
+                                        "janvier", "février", "fevrier", "mars", "avril", "mai", "juin",
+                                        "juillet", "août", "aout", "septembre", "octobre", "novembre",
+                                        "décembre", "decembre", "q1", "q2", "q3", "q4"
+                                    ] for cell in potential_periode_row if pd.notna(cell)
+                                )
+                                if has_periode:
+                                    periode_row_idx = idx + offset
+                                    print(
+                                        f"✅ Ligne des périodes trouvée dans {sheet_name} à la ligne {periode_row_idx}")
+
+                                    # Extraire le mapping colonne → période
+                                    month_mapping = {
+                                        "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+                                        "avril": 4, "mai": 5, "juin": 6,
+                                        "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+                                        "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+                                    }
+
+                                    for col_idx, cell_value in enumerate(potential_periode_row):
+                                        if pd.notna(cell_value):
+                                            cell_lower = str(cell_value).lower().strip()
+
+                                            # Vérifier si c'est un mois
+                                            for mois_name, mois_num in month_mapping.items():
+                                                if mois_name in cell_lower:
+                                                    periode_columns[col_idx] = ("mois", mois_num)
+                                                    print(f"   📅 Colonne {col_idx} = Mois {mois_num} ({cell_value})")
+                                                    break
+
+                                            # Vérifier si c'est un trimestre
+                                            cell_upper = str(cell_value).upper().strip()
+                                            if cell_upper in ["Q1", "Q2", "Q3", "Q4"]:
+                                                periode_columns[col_idx] = ("trimestre", cell_upper)
+                                                print(f"   📅 Colonne {col_idx} = Trimestre {cell_upper}")
+
+                                    break
+                        break
+
+                if not periode_columns:
+                    print(f"⚠️ Aucune colonne de période détectée dans {sheet_name}")
+                    continue
+
+                # 2. Trouver la section "Detail par qualite"
+                detail_start_idx = None
+                detail_end_idx = None
+
+                for idx, row in raw_sheet.iterrows():
+                    # Chercher "Detail par qualite"
+                    if any("detail par qualite" in str(cell).lower() for cell in row if pd.notna(cell)):
+                        detail_start_idx = idx
+                        print(f"✅ 'Detail par qualite' trouvé dans {sheet_name} à la ligne {idx}")
+                        continue
+
+                    # Chercher la fin (ligne "Lavage" ou "dont reprise")
+                    if detail_start_idx is not None and detail_end_idx is None:
+                        if any("lavage" in str(cell).lower() or "dont reprise" in str(cell).lower()
+                               for cell in row if pd.notna(cell)):
+                            detail_end_idx = idx
+                            print(f"🛑 Fin de section détectée dans {sheet_name} à la ligne {idx}")
+                            break
+
+                if detail_start_idx is None:
+                    print(f"⚠️ Section 'Detail par qualite' non trouvée dans {sheet_name}")
+                    continue
+
+                if detail_end_idx is None:
+                    detail_end_idx = len(raw_sheet)
+
+                # 3. Extraire la section "Detail par qualite"
+                detail_section = raw_sheet.iloc[detail_start_idx:detail_end_idx].copy()
+
+                # La première ligne après "Detail par qualite" contient les headers
+                headers_idx = 0
+                for idx in range(len(detail_section)):
+                    row = detail_section.iloc[idx]
+                    if any("secteur" in str(cell).lower() for cell in row if pd.notna(cell)):
+                        headers_idx = idx
+                        break
+
+                # Identifier la colonne "Secteur" et "Qualite"
+                headers_row = detail_section.iloc[headers_idx]
+                secteur_col_idx = None
+                qualite_col_idx = None
+
+                for col_idx, cell_value in enumerate(headers_row):
+                    if pd.notna(cell_value):
+                        cell_lower = str(cell_value).lower().strip()
+                        if "secteur" in cell_lower:
+                            secteur_col_idx = col_idx
+                        elif "qualite" in cell_lower or "qualité" in cell_lower:
+                            qualite_col_idx = col_idx
+
+                print(f"📋 Secteur colonne: {secteur_col_idx}, Qualite colonne: {qualite_col_idx}")
+
+                # 4. Traiter les données ligne par ligne
+                data_start_idx = headers_idx + 1
+                current_secteur = None
+
+                for row_idx in range(data_start_idx, len(detail_section)):
+                    row = detail_section.iloc[row_idx]
+
+                    # Vérifier si ligne vide complète
+                    if row.isna().all():
+                        continue
+
+                    # Récupérer Secteur et Qualité
+                    secteur_val = row.iloc[secteur_col_idx] if secteur_col_idx is not None else None
+                    qualite_val = row.iloc[qualite_col_idx] if qualite_col_idx is not None else None
+
+                    # Mettre à jour le secteur courant si non vide (forward-fill)
+                    if pd.notna(secteur_val) and str(secteur_val).strip() != "":
+                        current_secteur = str(secteur_val).strip()
+
+                    # Ignorer les lignes sans qualité
+                    if pd.isna(qualite_val) or str(qualite_val).strip() == "":
+                        continue
+
+                    # Utiliser le secteur courant
+                    secteur_to_use = current_secteur if current_secteur else ""
+                    qualite_to_use = str(qualite_val).strip()
+
+                    print(f"🔍 Traitement : Secteur='{secteur_to_use}' | Qualite='{qualite_to_use}'")
+
+                    # 5. Extraire les volumes en utilisant le mapping des périodes
+                    volumes_traites = []  # Pour éviter les doublons de mois
+
+                    # Parcourir les colonnes identifiées comme périodes
+                    for col_idx, (periode_type, periode_value) in periode_columns.items():
+                        if col_idx >= len(row):
+                            continue
+
+                        cell_value = row.iloc[col_idx]
+
+                        if pd.isna(cell_value) or cell_value == "" or cell_value == "-":
+                            continue
+
+                        try:
+                            volume_value = float(cell_value)
+
+                            if volume_value == 0:
+                                continue
+
+                            if periode_type == "mois":
+                                # Volume mensuel direct
+                                mois_num = periode_value
+                                volume_mensuel = volume_value * 1000  # Conversion Kt → T
+                                volumes_traites.append(mois_num)
+
+                                all_rows.append({
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois_num,
+                                    "Site/Entité": secteur_to_use,
+                                    "Qualité": qualite_to_use,
+                                    "Partenaire Groupe": "",
+                                    "Type Operation": "Extraction",
+                                    "Operation": "",
+                                    "VOLUME (T)": volume_mensuel,
+                                    "_source": sheet_name
+                                })
+                                print(f"   ✅ Mois {mois_num} : {volume_mensuel} T")
+
+                            elif periode_type == "trimestre":
+                                # Répartir le volume trimestriel sur 3 mois
+                                trimestre = periode_value
+                                volume_mensuel = (volume_value * 1000) / 3  # Conversion Kt → T et division par 3
+
+                                months = self.quarter_to_months[trimestre]
+                                for mois in months:
+                                    if mois not in volumes_traites:  # Éviter doublons
+                                        all_rows.append({
+                                            "Exercice": exercice,
+                                            "Date de la Version": str(date_version),
+                                            "Année": annee,
+                                            "Mois": mois,
+                                            "Site/Entité": secteur_to_use,
+                                            "Qualité": qualite_to_use,
+                                            "Partenaire Groupe": "",
+                                            "Type Operation": "Extraction",
+                                            "Operation": "",
+                                            "VOLUME (T)": volume_mensuel,
+                                            "_source": sheet_name
+                                        })
+                                        print(f"   ✅ {trimestre} → Mois {mois} : {volume_mensuel} T")
+
+                        except (ValueError, TypeError) as e:
+                            print(f"   ⚠️ Erreur conversion colonne {col_idx} : {e}")
+
+                # Sauvegarder la section pour export
+                extraction_data_list.append(detail_section.iloc[headers_idx:])
+                print(f"✅ {sheet_name} traité avec succès")
+
+            except Exception as e:
+                print(f"❌ Erreur traitement {sheet_name} : {e}")
+                import traceback
+                traceback.print_exc()
+
+        # Traitements physiques ------------------------------------------------------
+        print("\n" + "=" * 80)
+        print("🔧 TRAITEMENT PHYSIQUE - Début du processus")
+        print("=" * 80)
+
+        physical_sheet = next((s for s in xls.sheet_names if "physical" in s.lower() or "physique" in s.lower()), None)
+        physical_df = pd.DataFrame()
+
+        if physical_sheet:
+            # Étape 1 : Lecture des tables
+            print("\n📖 Étape 1 : Lecture des tables")
+            physical_df = self.extraire_table_par_nom(xls.parse(physical_sheet, header=None), "VolumeOutputProduct")
+
+            # Exclusion des produits pour traitements physiques
+            try:
+                exclusion_df = self.extraire_table_par_nom(xls.parse(physical_sheet, header=None),
+                                                           "Production_Exclusion")
+                if not exclusion_df.empty and 'Product' in exclusion_df.columns:
+                    excluded_products = exclusion_df['Product'].dropna().tolist()
+                    physical_df = physical_df[~physical_df['Output'].isin(excluded_products)]
+                    print(f" Produits exclus (Physical) : {excluded_products}")
+            except:
+                pass
+
+            mix_blending_df = self.extraire_table_par_nom(xls.parse(physical_sheet, header=None), "MixForBlending")
+
+            print(f"   ✅ VolumeOutputProduct : {len(physical_df)} lignes")
+            print(f"   ✅ MixForBlending : {len(mix_blending_df)} lignes")
+
+            # Lecture de la TreatmentMatrix depuis input_file
+            treatment_matrix_df = pd.DataFrame()
+
+            try:
+                treatment_matrix_df = self.extraire_table_par_nom(
+                    xls_input.parse("PhysicalTreatments", header=None),
+                    "TreatmentMatrix / TraitementOIK / HS"
+                )
+                if not treatment_matrix_df.empty:
+                    print(f"   La table #TreatmentMatrix / TraitementOIK / HS trouvée dans PhysicalTreatments avec : {len(treatment_matrix_df)} lignes")
+            except:
+                print(f"   La table #TreatmentMatrix / TraitementOIK / HS non trouvée dans PhysicalTreatments")
+
+            if treatment_matrix_df.empty:
+                print("   ⚠️ TreatmentMatrix non trouvée, traitement sans Yield")
+
+            # Vérification des tables nécessaires
+            if not physical_df.empty and not mix_blending_df.empty:
+                print("\n🔗 Étape 2 : Merge 1 - VolumeOutputProduct ⬅ MixForBlending")
+
+                # Avant le merge, dédupliquer MixForBlending
+                mix_blending_df_dedup = mix_blending_df.drop_duplicates(
+                    subset=['Entity', 'Input'],
+                    keep='first'
+                )
+
+                # Merge 1 : LEFT JOIN sur Entity + Output/Input
+                merged_df = pd.merge(
+                    physical_df,
+                    mix_blending_df_dedup,
+                    left_on=['Entity', 'Output'],
+                    right_on=['Entity', 'Input'],
+                    how='left',
+                    suffixes=('_volumeoutputproduct', '_mixforblending')
+                )
+
+                print(f"   ✅ Résultat Merge 1 : {len(merged_df)} lignes")
+
+                # Identifier les colonnes de volumes
+                volume_cols = [col for col in physical_df.columns if str(col).startswith('VolumeOutputProduct[')]
+                print(f"   📊 Colonnes de volumes détectées : {volume_cols}")
+
+                # Étape 3 : Traitement selon Output_right (Output_mixforblending)
+                print("\n⚙️ Étape 3 : Gestion du cas Output_right et application du Yield")
+
+                for idx, row in merged_df.iterrows():
+                    output_right = row.get('Output_mixforblending', None)
+                    entity = row.get('Entity', row.get('Entity_volumeoutputproduct', ''))
+                    output_left = row.get('Output', row.get('Output_volumeoutputproduct', ''))
+
+                    # Cas 1 : Output_right est NAN → pas de Yield, on garde les volumes originaux
+                    if pd.isna(output_right) or output_right == '':
+                        print(
+                            f"   ℹ️ Ligne {idx} : Output_right=NAN → Volume original conservé (Entity={entity}, Output={output_left})")
+                        yield_to_apply = 1.0
+
+                    # Cas 2 : Output_right existe → chercher le Yield dans TreatmentMatrix
+                    else:
+                        print(f"   🔍 Ligne {idx} : Output_right='{output_right}' → Recherche du Yield")
+
+                        if not treatment_matrix_df.empty:
+                            # Merge 2 : Chercher le Yield
+                            matching_yield = treatment_matrix_df[
+                                (treatment_matrix_df['Entity'] == entity) &
+                                (treatment_matrix_df['Input'] == output_right)
+                                ]
+
+                            if not matching_yield.empty and 'Yield' in matching_yield.columns:
+                                yield_value = matching_yield.iloc[0]['Yield']
+
+                                if pd.notna(yield_value):
+                                    try:
+                                        yield_to_apply = float(yield_value)
+                                        print(f"      ✅ Yield trouvé : {yield_to_apply}")
+                                    except (ValueError, TypeError):
+                                        print(f"      ⚠️ Yield invalide ({yield_value}), utilisation de Yield=1.0")
+                                        yield_to_apply = 1.0
+                                else:
+                                    print(f"      ⚠️ Yield NAN pour Entity={entity}, Input={output_right} → Yield=1.0")
+                                    yield_to_apply = 1.0
+                            else:
+                                print(
+                                    f"      ⚠️ Aucun match trouvé dans TreatmentMatrix pour Entity={entity}, Input={output_right} → Yield=1.0")
+                                yield_to_apply = 1.0
+                        else:
+                            print(f"      ⚠️ TreatmentMatrix vide → Yield=1.0")
+                            yield_to_apply = 1.0
+
+                    # Application du Yield sur TOUTES les colonnes de volumes
+                    if yield_to_apply != 1.0:
+                        print(f"      📐 Application du Yield {yield_to_apply} sur les volumes")
+
+                    for vol_col in volume_cols:
+                        original_value = row[vol_col]
+                        if pd.notna(original_value) and original_value != 0:
+                            try:
+                                new_value = float(original_value) * yield_to_apply
+                                merged_df.at[idx, vol_col] = new_value
+
+                                if yield_to_apply != 1.0:
+                                    print(f"         {vol_col}: {original_value} × {yield_to_apply} = {new_value}")
+                            except (ValueError, TypeError):
+                                print(f"         ⚠️ Impossible de convertir {vol_col}={original_value}")
+
+                # Nettoyer les colonnes pour revenir au format attendu par _process_volume_row
+                # On garde uniquement les colonnes originales de VolumeOutputProduct
+                columns_to_keep = ['Entity', 'Treatment', 'Output_volumeoutputproduct'] + volume_cols
+                physical_df_processed = merged_df[columns_to_keep].copy()
+
+                # # Renommer si nécessaire (enlever les suffixes)
+                # physical_df_processed.columns = [
+                #     col.replace('_volumeoutputproduct', '') for col in physical_df_processed.columns
+                # ]
+
+                # Renommer Output_volumeoutputproduct → Output
+                physical_df_processed.rename(columns={
+                    'Output_volumeoutputproduct': 'Output'
+                }, inplace=True)
+
+                print(f"\n✅ DataFrame final pour traitement : {len(physical_df_processed)} lignes")
+
+            else:
+                print("   ⚠️ MixForBlending vide, traitement standard sans Yield")
+                physical_df_processed = physical_df.copy()
+        else:
+            print("⚠️ Feuille Physical/Physique non trouvée")
+            physical_df_processed = pd.DataFrame()
+
+        # Traitement des lignes avec _process_volume_row (après application du Yield)
+        print("\n🔄 Traitement des volumes avec _process_volume_row")
+        for idx, row in physical_df_processed.iterrows():
+            processed_rows = self._process_volume_row(
+                row,
+                prefix="VolumeOutputProduct",
+                site_field="Entity",
+                qual_field="Output",
+                operation_label="Traitements Physiques",
+                exercice=exercice,
+                date_version=date_version,
+                annee=annee,
+            )
+            all_rows.extend(processed_rows)
+            print(f"   ✅ Ligne {idx} : {len(processed_rows)} lignes générées")
+
+        print("=" * 80)
+        print("✅ TRAITEMENT PHYSIQUE - Terminé")
+        print("=" * 80 + "\n")
+
+        # Traitements chimiques ------------------------------------------------------
+        chemical_sheet = next((s for s in xls.sheet_names if "chemical" in s.lower() or "chimique" in s.lower()), None)
+        chemical_df = pd.DataFrame()
+        if chemical_sheet:
+            chemical_df = self.extraire_table_par_nom(xls.parse(chemical_sheet, header=None), "Production")
+
+            # Exclusion des produits pour traitments chimiques
+            try:
+                exclusion_df = self.extraire_table_par_nom(xls.parse(chemical_sheet, header=None), "Production_Exclusion")
+                if not exclusion_df.empty and 'Product' in exclusion_df.columns:
+                    excluded_products = exclusion_df['Product'].dropna().tolist()
+                    chemical_df = chemical_df[~chemical_df['Product'].isin(excluded_products)]
+                    print(f" Produits exclus (Chemical) : {excluded_products}")
+            except:
+                pass
+
+        for _, row in chemical_df.iterrows():
+            all_rows.extend(
+                self._process_volume_row(
+                    row,
+                    prefix="Production",
+                    site_field="Entity",
+                    qual_field="Product",
+                    operation_label="Traitements Chimiques",
+                    exercice=exercice,
+                    date_version=date_version,
+                    annee=annee,
+                )
+            )
+
+        # Expédition ----------------------------------------------------------------
+        print("\n" + "=" * 80)
+        print("📦 EXPÉDITION - Début du processus")
+        print("=" * 80)
+
+        connexions_sheet = "Connexions"
+        expedition_df = pd.DataFrame()
+
+        if connexions_sheet in xls.sheet_names:
+            try:
+                connexions_raw = xls.parse(connexions_sheet, header=None)
+                flow_df = self.extraire_table_par_nom(connexions_raw, "Flow")
+
+                # Filtrer sur Connexion contenant "Expedition"
+                if not flow_df.empty and 'Connexion' in flow_df.columns:
+                    expedition_df = flow_df[
+                        flow_df['Connexion'].str.contains('Expedition', case=False, na=False)
+                    ].copy()
+
+                    print(f"✅ Table #Flow : {len(flow_df)} lignes")
+                    print(f"✅ Filtre 'Expedition' : {len(expedition_df)} lignes retenues")
+
+                    # Identifier colonnes de volumes Flow[...]
+                    flow_volume_cols = [col for col in expedition_df.columns if col.startswith('Flow[')]
+                    print(f"📊 Colonnes Flow détectées : {flow_volume_cols}")
+
+                    # Mapping des mois/trimestres
+                    month_mapping = {
+                        "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+                        "avril": 4, "mai": 5, "juin": 6,
+                        "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+                        "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+                    }
+
+                    for idx, row in expedition_df.iterrows():
+                        origin = row.get('Origin', '')
+                        product = row.get('Product', '')
+                        destination = row.get('Destination', '')
+                        year = row.get('Year', annee)
+
+                        volumes_traites = []
+
+                        # 1. Colonnes mensuelles
+                        for col in flow_volume_cols:
+                            col_lower = str(col).lower().strip()
+
+                            # Extraire le nom entre crochets
+                            if '[' in col and ']' in col:
+                                period_name = col.split('[')[1].split(']')[0].lower().strip()
+
+                                # Vérifier si c'est un mois
+                                mois_num = None
+                                for mois_name, mois_n in month_mapping.items():
+                                    if mois_name in period_name:
+                                        mois_num = mois_n
+                                        break
+
+                                if mois_num and pd.notna(row[col]):
+                                    try:
+                                        volume_value = float(row[col])
+                                        if volume_value != 0:
+                                            volume_mensuel = volume_value * 1000  # Kt → T
+                                            volumes_traites.append(mois_num)
+
+                                            all_rows.append({
+                                                "Exercice": exercice,
+                                                "Date de la Version": str(date_version),
+                                                "Année": year,
+                                                "Mois": mois_num,
+                                                "Site/Entité": origin,
+                                                "Qualité": product,
+                                                "Partenaire Groupe": destination,
+                                                "Type Operation": "Expedition",
+                                                "Operation": "",
+                                                "VOLUME (T)": volume_mensuel,
+                                                "_source": "Flow_Expedition"
+                                            })
+                                    except (ValueError, TypeError):
+                                        pass
+
+                        # 2. Colonnes trimestrielles (pour mois non couverts)
+                        for col in flow_volume_cols:
+                            col_upper = str(col).upper().strip()
+
+                            if 'Q1' in col_upper or 'Q2' in col_upper or 'Q3' in col_upper or 'Q4' in col_upper:
+                                # Extraire Q1/Q2/Q3/Q4
+                                for q in ["Q1", "Q2", "Q3", "Q4"]:
+                                    if q in col_upper and pd.notna(row[col]):
+                                        try:
+                                            volume_value = float(row[col])
+                                            if volume_value != 0:
+                                                volume_mensuel = (volume_value * 1000) / 3  # Kt → T / 3
+
+                                                months = self.quarter_to_months[q]
+                                                for mois in months:
+                                                    if mois not in volumes_traites:
+                                                        all_rows.append({
+                                                            "Exercice": exercice,
+                                                            "Date de la Version": str(date_version),
+                                                            "Année": year,
+                                                            "Mois": mois,
+                                                            "Site/Entité": origin,
+                                                            "Qualité": product,
+                                                            "Partenaire Groupe": destination,
+                                                            "Type Operation": "Expedition",
+                                                            "Operation": "",
+                                                            "VOLUME (T)": volume_mensuel,
+                                                            "_source": "Flow_Expedition"
+                                                        })
+                                        except (ValueError, TypeError):
+                                            pass
+                                        break
+
+                    print(f"✅ Expédition traitée : lignes ajoutées à all_rows")
+                else:
+                    print("⚠️ Colonne 'Connexion' non trouvée dans #Flow")
+
+            except Exception as e:
+                print(f"❌ Erreur traitement Expédition : {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("⚠️ Feuille 'Connexions' non trouvée")
+
+        print("=" * 80)
+        print("✅ EXPÉDITION - Terminé")
+        print("=" * 80 + "\n")
+
+        if not all_rows:
+            st.error("Aucune donnée trouvée pour PPV Production.")
+            return pd.DataFrame(), b""
+
+        df_final = pd.DataFrame(all_rows)
+        df_final.insert(0, "#ID", [f"#{i + 1}" for i in range(len(df_final))])
+
+        # Export Excel avec feuilles séparées pour chaque table source
+        print("📊 Génération fichier Excel PPV Production...")
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            # Feuille 1: Fichier plat (avec formatage coloré)
+            df_final.to_excel(writer, index=False, sheet_name="Fichier plat PPV Production")
+            workbook = writer.book
+            worksheet = writer.sheets["Fichier plat PPV Production"]
+            format_extraction = workbook.add_format({"bg_color": "#E8F4FD"})
+            format_physical = workbook.add_format({"bg_color": "#E8F5E8"})
+            format_chemical = workbook.add_format({"bg_color": "#FFF8E1"})
+            for row_idx, op in enumerate(df_final["Type Operation"], start=1):
+                fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
+                worksheet.set_row(row_idx, cell_format=fmt)
+
+            # Feuilles des tables sources
+            for i, extraction_source_df in enumerate(extraction_data_list):
+                if not extraction_source_df.empty:
+                    sheet_name = f"Extraction_{extraction_sheets[i]}"
+                    extraction_source_df.to_excel(writer, index=False, sheet_name=sheet_name)
+                    print(f"✅ Table source : {sheet_name} ({len(extraction_source_df)} lignes)")
+
+            if not physical_df.empty:
+                physical_df.to_excel(writer, index=False, sheet_name="VolumeOutputProduct")
+                print(f"✅ Table source : VolumeOutputProduct ({len(physical_df)} lignes)")
+
+            if not chemical_df.empty:
+                chemical_df.to_excel(writer, index=False, sheet_name="Production")
+                print(f"✅ Table source : Production ({len(chemical_df)} lignes)")
+
+            # Coloration des onglets selon le type d'opération
+            tab_color_map = {
+                "Extraction_OIK": "#E8F4FD",
+                "Extraction_OIB": "#E8F4FD",
+                "Extraction_OIG": "#E8F4FD",
+                "VolumeOutputProduct": "#E8F5E8",
+                "Production": "#FFF8E1",
+            }
+            for sheet_name, color in tab_color_map.items():
+                if sheet_name in writer.sheets:
+                    writer.sheets[sheet_name].set_tab_color(color)
+
+        return df_final, output.getvalue()
+
+
     # ---------------------------------------------------------------------------
     # Module 2: Ventes & Matières Premières
     # ---------------------------------------------------------------------------
@@ -3268,7 +3892,7 @@ class AnaplanMainApp:
                     status_text.text("📊 Génération PPV Production...")
                     progress_bar.progress(0.2)
                     try:
-                        prod_df, prod_bytes = self.generate_ppv_production_v3(ppv_file, summary_file, exercice, date_version)
+                        prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, exercice, date_version)
                         if len(prod_df):
                             all_files["fichier_ppv_production.xlsx"] = prod_bytes
                     except Exception as e:
@@ -3419,7 +4043,7 @@ class AnaplanMainApp:
                             
                             # PPV Production
                             try:
-                                prod_df, prod_bytes = self.generate_ppv_production_v3(ppv_file, summary_file, exercice, date_version)
+                                prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, exercice, date_version)
                                 if len(prod_df):
                                     excel_filename = "fichier_ppv_production.xlsx"
                                     with open(excel_filename, 'wb') as f:
