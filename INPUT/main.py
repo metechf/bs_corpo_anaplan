@@ -2582,7 +2582,7 @@ class AnaplanMainApp:
         # flow_df = flow_df[flow_df['Connexion'].str.contains('VenteLocale', case=False, na=False)]
         # session_price_filtered = session_price_df[session_price_df['Connexion'].str.contains('VenteLocale', case=False, na=False)]
 
-        mots_cles = ['Cession', 'Tolling', 'Achat MP', 'VenteLocale']
+        mots_cles = ['Cession', 'Tolling', 'Achat MP', 'Vente Locale']
 
         # Créer un pattern regex avec OR (|)
         pattern = '|'.join(mots_cles)
