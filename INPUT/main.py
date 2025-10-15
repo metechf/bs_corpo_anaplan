@@ -3645,7 +3645,7 @@ class AnaplanMainApp:
                 </ul>
             </div>
         """, unsafe_allow_html=True)
-        
+
         ppv_file = None
         if summary_file:
             ppv_file = st.file_uploader(
@@ -3676,7 +3676,45 @@ class AnaplanMainApp:
             """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
-        
+
+
+        # Étape 3: Fichier Input
+        st.markdown("""
+        <div class="step-card">
+            <div class="step-header">
+                <div class="step-number">3</div>
+                <h3 class="step-title"><i class="fas fa-chart-line"></i> Fichier INPUT</h3>
+            </div>
+            <div style="background: #e8f5e9; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #2e7d32;">
+                <strong>⚗️ Ce fichier permet de calculer le volume des traitement physiques :</strong>
+                <ul style="margin: 0.5rem 0 0 1rem;">
+                    <li>✅ Fichier PPV Production</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+        input_file = st.file_uploader(
+            "Sélectionner le fichier INPUT (Excel)",
+            type=["xlsx"],
+            key="input_file",
+            help="📋 Ce fichier contient les données pour PPV Production (volume des traitements physiques)"
+        )
+
+        if input_file:
+            st.markdown("""
+            <div class="status-success">
+                <i class="fas fa-check-circle"></i> Fichier INPUT chargé avec succès
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="status-pending">
+                <i class="fas fa-clock"></i> En attente du fichier INPUT
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
         # Étape 3: Upload Anaplan-Ref
         st.markdown("""
         <div class="step-card">
@@ -3841,7 +3879,7 @@ class AnaplanMainApp:
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Étape 4: Génération
-        if summary_file and ppv_file and exercice and date_version:
+        if summary_file and ppv_file and input_file and exercice and date_version:
             st.markdown("""
             <div class="step-card">
                 <div class="step-header">
@@ -3892,7 +3930,8 @@ class AnaplanMainApp:
                     status_text.text("📊 Génération PPV Production...")
                     progress_bar.progress(0.2)
                     try:
-                        prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, exercice, date_version)
+
+                        prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, input_file, exercice, date_version)
                         if len(prod_df):
                             all_files["fichier_ppv_production.xlsx"] = prod_bytes
                     except Exception as e:
@@ -4043,7 +4082,7 @@ class AnaplanMainApp:
                             
                             # PPV Production
                             try:
-                                prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, exercice, date_version)
+                                prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, input_file, exercice, date_version)
                                 if len(prod_df):
                                     excel_filename = "fichier_ppv_production.xlsx"
                                     with open(excel_filename, 'wb') as f:
