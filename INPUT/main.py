@@ -317,9 +317,13 @@ class AnaplanMainApp:
         process_keywords = {
             'concentration', 'fusion', 'phosphorique', 'sulfurique', 
             'granulation', 'banalization', 'clarification', 'purification',
-            'treatment', 'process', 'production', 'manufacturing'
+            'treatment', 'process', 'production', 'manufacturing', 'pretraitement',
+            'arp-stage', 'co-cristalisation', 'granulation ligne 107def',
+            'granulation ligne map soluble', 'granulation nouvelles lignes', 'granulation tsp',
+             'granulation tolling', 'granulation anciennes lignes', 'granulationmcp', 'granulation tsp hub',
+             'granulationdcp'
         }
-        
+
         # Mots-clés de CONSOMMATION SPÉCIFIQUE à INCLURE
         consumption_keywords = {
             'energy', 'energie', 'electrical', 'electrique', 
@@ -546,9 +550,9 @@ class AnaplanMainApp:
             format_extraction = workbook.add_format({"bg_color": "#E8F4FD"})
             format_physical = workbook.add_format({"bg_color": "#E8F5E8"})
             format_chemical = workbook.add_format({"bg_color": "#FFF8E1"})
-            for row_idx, op in enumerate(df_final["Type Operation"], start=1):
-                fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
-                worksheet.set_row(row_idx, cell_format=fmt)
+            # for row_idx, op in enumerate(df_final["Type Operation"], start=1):
+            #     fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
+            #     worksheet.set_row(row_idx, cell_format=fmt)
 
             # Feuilles des tables sources (avec structure originale)
             if not extraction_df.empty:
@@ -768,8 +772,7 @@ class AnaplanMainApp:
                                     "Site/Entité": secteur_to_use,
                                     "Qualité": qualite_to_use,
                                     "Partenaire Groupe": "",
-                                    "Type Operation": "Extraction",
-                                    "Operation": "",
+                                    "Operation": "Extraction",
                                     "VOLUME (T)": volume_mensuel,
                                     "_source": sheet_name
                                 })
@@ -791,8 +794,7 @@ class AnaplanMainApp:
                                             "Site/Entité": secteur_to_use,
                                             "Qualité": qualite_to_use,
                                             "Partenaire Groupe": "",
-                                            "Type Operation": "Extraction",
-                                            "Operation": "",
+                                            "Operation": "Extraction",
                                             "VOLUME (T)": volume_mensuel,
                                             "_source": sheet_name
                                         })
@@ -869,9 +871,9 @@ class AnaplanMainApp:
             format_extraction = workbook.add_format({"bg_color": "#E8F4FD"})
             format_physical = workbook.add_format({"bg_color": "#E8F5E8"})
             format_chemical = workbook.add_format({"bg_color": "#FFF8E1"})
-            for row_idx, op in enumerate(df_final["Type Operation"], start=1):
-                fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
-                worksheet.set_row(row_idx, cell_format=fmt)
+            # for row_idx, op in enumerate(df_final["Type Operation"], start=1):
+            #     fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
+            #     worksheet.set_row(row_idx, cell_format=fmt)
 
             # Feuilles des tables sources
             for i, extraction_source_df in enumerate(extraction_data_list):
@@ -1096,8 +1098,7 @@ class AnaplanMainApp:
                                     "Site/Entité": secteur_to_use,
                                     "Qualité": qualite_to_use,
                                     "Partenaire Groupe": "",
-                                    "Type Operation": "Extraction",
-                                    "Operation": "",
+                                    "Operation": "Extraction",
                                     "VOLUME (T)": volume_mensuel,
                                     "_source": sheet_name
                                 })
@@ -1119,8 +1120,7 @@ class AnaplanMainApp:
                                             "Site/Entité": secteur_to_use,
                                             "Qualité": qualite_to_use,
                                             "Partenaire Groupe": "",
-                                            "Type Operation": "Extraction",
-                                            "Operation": "",
+                                            "Operation": "Extraction",
                                             "VOLUME (T)": volume_mensuel,
                                             "_source": sheet_name
                                         })
@@ -1417,8 +1417,7 @@ class AnaplanMainApp:
                                                 "Site/Entité": origin,
                                                 "Qualité": product,
                                                 "Partenaire Groupe": destination,
-                                                "Type Operation": "Expedition",
-                                                "Operation": "",
+                                                "Operation": "Expedition",
                                                 "VOLUME (T)": volume_mensuel,
                                                 "_source": "Flow_Expedition"
                                             })
@@ -1449,8 +1448,7 @@ class AnaplanMainApp:
                                                             "Site/Entité": origin,
                                                             "Qualité": product,
                                                             "Partenaire Groupe": destination,
-                                                            "Type Operation": "Expedition",
-                                                            "Operation": "",
+                                                            "Operation": "Expedition",
                                                             "VOLUME (T)": volume_mensuel,
                                                             "_source": "Flow_Expedition"
                                                         })
@@ -1492,9 +1490,9 @@ class AnaplanMainApp:
             format_extraction = workbook.add_format({"bg_color": "#E8F4FD"})
             format_physical = workbook.add_format({"bg_color": "#E8F5E8"})
             format_chemical = workbook.add_format({"bg_color": "#FFF8E1"})
-            for row_idx, op in enumerate(df_final["Type Operation"], start=1):
-                fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
-                worksheet.set_row(row_idx, cell_format=fmt)
+            # for row_idx, op in enumerate(df_final["Type Operation"], start=1):
+            #     fmt = format_extraction if op == "Extraction" else format_physical if op == "Traitements Physiques" else format_chemical
+            #     worksheet.set_row(row_idx, cell_format=fmt)
 
             # Feuilles des tables sources
             for i, extraction_source_df in enumerate(extraction_data_list):
@@ -3314,8 +3312,6 @@ class AnaplanMainApp:
             "Date de la Version": str(date_version),
             "Année": annee_series,
             "Site/Entité": df_total.get("Facility", df_total.get("Site/Entité", "")),
-            'Treatment': df_total["Treatment"],
-            'Flow': df_total["Flow"],
             "Qualité": df_total["Output"],
             "Type Consommation Spécifique": df_total["Type Consommation Spécifique"],
             "Ratio": df_total["Ratio"],
@@ -3323,7 +3319,7 @@ class AnaplanMainApp:
         })
 
         df_final = df_final.drop_duplicates(
-            subset=["Site/Entité", 'Treatment', 'Flow', "Qualité", "Type Consommation Spécifique"]
+            subset=["Site/Entité", "Qualité", "Type Consommation Spécifique"]
         ).reset_index(drop=True)
 
         # Créer la version sans "Ratio Moyen"
@@ -4312,8 +4308,8 @@ class AnaplanMainApp:
                 "Site/Entité": row.get(site_field, ""),
                 "Qualité": row.get(qual_field, ""),
                 "Partenaire Groupe": "",
-                "Type Operation": operation_label,
-                "Operation": row.get('Treatment', ''),
+                # "Type Operation": operation_label,
+                "Operation": row.get('Treatment', operation_label),
                 "VOLUME (T)": vol * 1000, # Convertir en t
             })
 
@@ -4333,8 +4329,8 @@ class AnaplanMainApp:
                     "Site/Entité": row.get(site_field, ""),
                     "Qualité": row.get(qual_field, ""),
                     "Partenaire Groupe": "",
-                    "Type Operation": operation_label,
-                    "Operation": row.get('Treatment', ''),
+                    # "Type Operation": operation_label,
+                    "Operation": row.get('Treatment', operation_label),
                     "VOLUME (T)": per_month * 1000, # Convertir en t
                 })
 
