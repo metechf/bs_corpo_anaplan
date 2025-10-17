@@ -28,6 +28,7 @@ class AnaplanMapper:
             self.ref_tables['operation'] = pd.read_excel(self.ref_file_path, sheet_name='Opération')
             self.ref_tables['ratios'] = pd.read_excel(self.ref_file_path, sheet_name='Ckecklibs')
             self.ref_tables['site_entite_vente'] = pd.read_excel(self.ref_file_path, sheet_name='SiteEntité_vente')
+            self.ref_tables['site_entite_prod'] = pd.read_excel(self.ref_file_path, sheet_name='SiteEntité_Prod')
                 
         except Exception as e:
             print(f"❌ Erreur lors du chargement des tables de référence: {e}")
@@ -177,7 +178,43 @@ class AnaplanMapper:
                 return row['Code P/CC']
         
         return site_entite  # Retourner tel quel si pas de correspondance
-    
+
+    # def map_site_entite_prod(self, site_entite):
+    #     """Mappe le site/entité vers le code correspondant."""
+    #     site_norm = self.normalize_text(site_entite)
+    #
+    #     # Recherche exacte
+    #     for _, row in self.ref_tables['site_entite_prod'].iterrows():
+    #         if self.normalize_text(row['Libellé Site/Entité']) == site_norm:
+    #             return row['Code P/CC']
+    #
+    #     # Recherche partielle
+    #     for _, row in self.ref_tables['site_entite'].iterrows():
+    #         libelle_norm = self.normalize_text(row['Libellé Site/Entité'])
+    #         if site_norm in libelle_norm or libelle_norm in site_norm:
+    #             return row['Code P/CC']
+    #
+    #     return site_entite  # Retourner tel quel si pas de correspondance
+
+
+    def map_site_entite_prod(self, site_entite, qualite):
+        """Mapping spécialisé pour Site/Entité dans PPV_production : Site/Entité#Qualité → code SAP_2"""
+        # Normaliser les valeurs d'entrée
+        site_entite_norm = self.normalize_text(site_entite)
+        qualite_norm = self.normalize_text(qualite)
+
+        # Créer la clé de recherche : Site/Entité#Qualité
+        search_key = f"{site_entite_norm}#{qualite_norm}"
+
+        # Rechercher dans la table SiteEntité_prod
+        for _, row in self.ref_tables['site_entite_prod'].iterrows():
+            ref_key = self.normalize_text(row['Site/Entité#Qualité'])
+            if ref_key == search_key:
+                return row['code SAP_2']
+
+        # Si pas de correspondance, retourner Site/Entité original
+        return site_entite
+
     def map_partenaire_groupe(self, partenaire):
         """Mappe le partenaire groupe vers le code correspondant."""
         partenaire_norm = self.normalize_text(partenaire)
@@ -193,8 +230,8 @@ class AnaplanMapper:
         operation_norm = self.normalize_text(operation)
         
         for _, row in self.ref_tables['operation'].iterrows():
-            if self.normalize_text(row['Opération']) == operation_norm:
-                return row['Code Opération']
+            if self.normalize_text(row['Opération BS']) == operation_norm:
+                return row['Macro Opération']
         
         return operation  # Retourner tel quel si pas de correspondance
     
@@ -203,16 +240,16 @@ class AnaplanMapper:
         # Normaliser les valeurs d'entrée
         site_entite_norm = self.normalize_text(site_entite)
         qualite_norm = self.normalize_text(qualite)
-        
+
         # Créer la clé de recherche : Site/Entité#Qualité
         search_key = f"{site_entite_norm}#{qualite_norm}"
-        
+
         # Rechercher dans la table SiteEntité_vente
         for _, row in self.ref_tables['site_entite_vente'].iterrows():
             ref_key = self.normalize_text(row['Site/Entité#Qualité'])
             if ref_key == search_key:
                 return row['code SAP_2']
-        
+
         # Si pas de correspondance, retourner Site/Entité original
         return site_entite
     
@@ -224,13 +261,17 @@ class AnaplanMapper:
         
         # Remplacer directement les valeurs dans les colonnes existantes
         if 'Site/Entité' in df_mapped.columns:
-            df_mapped['Site/Entité'] = df_mapped['Site/Entité'].apply(self.map_site_entite)
-        
+            # df_mapped['Site/Entité'] = df_mapped['Site/Entité'].apply(self.map_site_entite_prod)
+            df_mapped['Site/Entité'] = df_mapped.apply(
+                lambda row: self.map_site_entite_prod(row['Site/Entité'], row['Qualité']),
+                axis=1
+            )
+
         if 'Qualité' in df_mapped.columns:
             df_mapped['Qualité'] = df_mapped['Qualité'].apply(self.map_qualite)
         
-        if 'Opération' in df_mapped.columns:
-            df_mapped['Opération'] = df_mapped['Opération'].apply(self.map_operation)
+        if 'Operation' in df_mapped.columns:
+            df_mapped['Operation'] = df_mapped['Operation'].apply(self.map_operation)
         
         # Note: PPV Production n'a pas de colonne "Bloc", elle utilise "Opération"
         
@@ -252,7 +293,7 @@ class AnaplanMapper:
         # Mapping spécialisé pour Site/Entité dans Ventes & MP : Site/Entité#Qualité → code SAP_2
         if 'Site/Entité' in df_mapped.columns and 'Qualité' in df_mapped.columns:
             df_mapped['Site/Entité'] = df_mapped.apply(
-                lambda row: self.map_site_entite_ventes_specialise(row['Site/Entité'], row['Qualité']), 
+                lambda row: self.map_site_entite_ventes_specialise(row['Site/Entité'], row['Qualité']),
                 axis=1
             )
         
@@ -339,7 +380,33 @@ class AnaplanMapper:
         df_mapped = self.normalize_column_names(df_mapped)
 
         return df_mapped
-    
+
+    def map_ratios_matieres_v2(self, df):
+        """Applique le mapping sur le DataFrame Ratios Matières."""
+
+        df_mapped = df.copy()
+
+        if 'Site/Entité' in df_mapped.columns:
+            df_mapped['Site/Entité'] = df_mapped['Site/Entité'].apply(self.map_site_entite)
+
+        if 'Qualité' in df_mapped.columns:
+            df_mapped['Qualité'] = df_mapped['Qualité'].apply(self.map_qualite)
+
+        if 'Type Consommation Spécifique' in df_mapped.columns:
+            df_mapped['Type Consommation Spécifique'] = df_mapped['Type Consommation Spécifique'].apply(
+                self.map_qualite)
+
+        if 'Bloc' in df_mapped.columns:
+            df_mapped = df_mapped.drop('Bloc', axis=1)
+
+        df_mapped = df_mapped.drop_duplicates(
+            subset=["Site/Entité", "Qualité", "Type Consommation Spécifique"]
+        ).reset_index(drop=True)
+
+        df_mapped = self.normalize_column_names(df_mapped)
+
+        return df_mapped
+
     def verify_ratio(self, row):
         """Vérifie si le ratio existe dans la table de référence."""
         qualite = self.normalize_text(row.get('Qualité', ''))
@@ -519,7 +586,7 @@ class AnaplanMapper:
             try:
 
                 df_ratios = pd.read_excel(ratios_matieres_file)
-                df_ratios_mapped = self.map_ratios_matieres(df_ratios)
+                df_ratios_mapped = self.map_ratios_matieres_v2(df_ratios)
                 
                 # Sauvegarder en Excel avec couleurs + CSV
                 excel_file = self.save_to_excel_with_colors(df_ratios_mapped, ratios_matieres_file, "Ratios_Matieres_mapped.xlsx")
