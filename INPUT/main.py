@@ -2580,7 +2580,9 @@ class AnaplanMainApp:
         # flow_df = flow_df[flow_df['Connexion'].str.contains('VenteLocale', case=False, na=False)]
         # session_price_filtered = session_price_df[session_price_df['Connexion'].str.contains('VenteLocale', case=False, na=False)]
 
-        mots_cles = ['Cession', 'Tolling', 'Achat MP', 'Vente Locale']
+        # mots_cles = ['Cession', 'Tolling', 'Achat MP', 'Vente Locale']
+        # Update: Suite au call avec Zakaria le 18/10/2025, on laisse juste le filtre 'Vente Locale'
+        mots_cles = ['Vente Locale']
 
         # Créer un pattern regex avec OR (|)
         pattern = '|'.join(mots_cles)
@@ -2909,13 +2911,14 @@ class AnaplanMainApp:
             "Bloc", "_ordre_tri", "_ordre_export", "_ordre_prix", "Mois"
         ]).reset_index(drop=True)
 
-        df_final = df_final.drop(["_ordre_tri", "_ordre_export", "_ordre_original", "_ordre_prix"], axis=1)
+        # Suite la remarque de Zakaria via Mail, on supprime les colonne "Bloc" et "TypeProduct"
+        df_final = df_final.drop(["TypeProduct", "_ordre_tri", "_ordre_export", "_ordre_original", "_ordre_prix"], axis=1)
         df_final.insert(0, "#ID", [f"#{i + 1}" for i in range(len(df_final))])
 
         # Export Excel avec tables sources
         output = BytesIO()
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-            df_final.to_excel(writer, index=False, sheet_name="Fichier plat Ventes et MP")
+            df_final.drop(["Bloc"], axis=1).to_excel(writer, index=False, sheet_name="Fichier plat Ventes et MP")
             workbook = writer.book
             worksheet = writer.sheets["Fichier plat Ventes et MP"]
             format_bloc1 = workbook.add_format({"bg_color": "#DCE6F1"})
