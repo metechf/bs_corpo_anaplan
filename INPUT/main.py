@@ -761,7 +761,7 @@ class AnaplanMainApp:
                             if periode_type == "mois":
                                 # Volume mensuel direct
                                 mois_num = periode_value
-                                volume_mensuel = volume_value * 1  # Conversion Kt → T
+                                volume_mensuel = volume_value * 0.001  # Conversion Kt → T
                                 volumes_traites.append(mois_num)
 
                                 all_rows.append({
@@ -781,7 +781,7 @@ class AnaplanMainApp:
                             elif periode_type == "trimestre":
                                 # Répartir le volume trimestriel sur 3 mois
                                 trimestre = periode_value
-                                volume_mensuel = (volume_value * 1) / 3  # Conversion Kt → T et division par 3
+                                volume_mensuel = (volume_value * 0.001) / 3  # Conversion Kt → T et division par 3
 
                                 months = self.quarter_to_months[trimestre]
                                 for mois in months:
@@ -1087,7 +1087,7 @@ class AnaplanMainApp:
                             if periode_type == "mois":
                                 # Volume mensuel direct
                                 mois_num = periode_value
-                                volume_mensuel = volume_value * 1  # Conversion Kt → T
+                                volume_mensuel = volume_value * 0.001  # Conversion Kt → T
                                 volumes_traites.append(mois_num)
 
                                 all_rows.append({
@@ -1107,7 +1107,7 @@ class AnaplanMainApp:
                             elif periode_type == "trimestre":
                                 # Répartir le volume trimestriel sur 3 mois
                                 trimestre = periode_value
-                                volume_mensuel = (volume_value * 1) / 3  # Conversion Kt → T et division par 3
+                                volume_mensuel = (volume_value * 0.001) / 3  # Conversion Kt → T et division par 3
 
                                 months = self.quarter_to_months[trimestre]
                                 for mois in months:
@@ -1406,7 +1406,7 @@ class AnaplanMainApp:
                                     try:
                                         volume_value = float(row[col])
                                         if volume_value != 0:
-                                            volume_mensuel = volume_value * 1  # Kt → T
+                                            volume_mensuel = volume_value * 0.001  # Kt → T
                                             volumes_traites.append(mois_num)
 
                                             all_rows.append({
@@ -1435,7 +1435,7 @@ class AnaplanMainApp:
                                         try:
                                             volume_value = float(row[col])
                                             if volume_value != 0:
-                                                volume_mensuel = (volume_value * 1) / 3  # Kt → T / 3
+                                                volume_mensuel = (volume_value * 0.001) / 3  # Kt → T / 3
 
                                                 months = self.quarter_to_months[q]
                                                 for mois in months:
@@ -1761,7 +1761,7 @@ class AnaplanMainApp:
                                     "Pays": pays,
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1804,7 +1804,7 @@ class AnaplanMainApp:
                                     "Pays": pays,
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                     "PRIX FOB": prix_fob_mois,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1902,7 +1902,7 @@ class AnaplanMainApp:
                                     "Pays": "Maroc",
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1945,7 +1945,7 @@ class AnaplanMainApp:
                                     "Pays": "Maroc",
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                     "PRIX FOB": prix_fob_mois,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -2021,7 +2021,7 @@ class AnaplanMainApp:
                                 "Pays": "Maroc",
                                 "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                 "PRIX FOB": prix_fob,
                                 "Prix Fret": "",
                                 "Prix Frais d'approche MP": "",
@@ -2108,7 +2108,7 @@ class AnaplanMainApp:
                                         "Pays": "Maroc",
                                         "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                        "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                        "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                         "PRIX FOB": prix_fob,
                                         "Prix Fret": "",
                                         "Prix Frais d'approche MP": "",
@@ -2157,7 +2157,7 @@ class AnaplanMainApp:
                                     "Pays": "Maroc",
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -2200,7 +2200,7 @@ class AnaplanMainApp:
                             "Pays": "Maroc",
                             "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                            "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
+                            "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
                             "PRIX FOB": prix_fob,
                             "Prix Fret": "",
                             "Prix Frais d'approche MP": "",
@@ -2392,7 +2392,7 @@ class AnaplanMainApp:
                     volume_value = row[col]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 1  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 0.001  # MODIFIÉ: ajout *1000 (KT→T)
                             mois_num = None
                             for month_name, month_num in month_mapping.items():
                                 if month_name in str(col):
@@ -2432,7 +2432,7 @@ class AnaplanMainApp:
                     volume_value = row[volume_colonne]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 1 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 0.001 / 3  # MODIFIÉ: ajout *1000 (KT→T)
                         except (ValueError, TypeError):
                             continue
 
@@ -2505,7 +2505,7 @@ class AnaplanMainApp:
                     volume_value = row[col]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 1  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 0.001  # MODIFIÉ: ajout *1000 (KT→T)
                             mois_num = None
                             for month_name, month_num in month_mapping.items():
                                 if month_name in str(col):
@@ -2544,7 +2544,7 @@ class AnaplanMainApp:
                     volume_value = row[volume_colonne]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 1 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 0.001 / 3  # MODIFIÉ: ajout *1000 (KT→T)
                         except (ValueError, TypeError):
                             continue
 
@@ -2620,7 +2620,7 @@ class AnaplanMainApp:
                     volume_value = row[col]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 1
+                            volume_mensuel = float(volume_value) * 0.001
                             mois_num = None
                             for month_name, month_num in month_mapping.items():
                                 if month_name in str(col):
@@ -2669,7 +2669,7 @@ class AnaplanMainApp:
                 colname = f"Flow[{q}]"
                 if colname in row and pd.notna(row[colname]):
                     try:
-                        volume_mensuel = float(row[colname]) * 1 / 3
+                        volume_mensuel = float(row[colname]) * 0.001 / 3
                     except:
                         continue
 
@@ -2743,7 +2743,7 @@ class AnaplanMainApp:
                         volume_value = row[col]
                         if pd.notna(volume_value):
                             try:
-                                volume_mensuel = float(volume_value) * 1  # MODIFIÉ: ajout *1000 (KT→T)
+                                volume_mensuel = float(volume_value) * 0.001  # MODIFIÉ: ajout *1000 (KT→T)
                                 mois_num = None
                                 for month_name, month_num in month_mapping.items():
                                     if month_name in str(col):
@@ -2798,7 +2798,7 @@ class AnaplanMainApp:
                     colname = f"Flow[{q}]"  # MODIFIÉ: Flow[ au lieu de Volume[
                     if colname in row and pd.notna(row[colname]):
                         try:
-                            volume_mensuel = float(row[colname]) * 1 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(row[colname]) * 0.001 / 3  # MODIFIÉ: ajout *1000 (KT→T)
                         except:
                             continue
 
@@ -2843,7 +2843,7 @@ class AnaplanMainApp:
                 volume_simple = row.get("Flow", 0)  # MODIFIÉ: Flow au lieu de Volume
                 if pd.notna(volume_simple):
                     try:
-                        volume_mensuel = float(volume_simple) * 1 / 12  # MODIFIÉ: ajout *1000 (KT→T)
+                        volume_mensuel = float(volume_simple) * 0.001 / 12  # MODIFIÉ: ajout *1000 (KT→T)
                     except:
                         volume_mensuel = ""
 
@@ -4313,7 +4313,7 @@ class AnaplanMainApp:
                 "Partenaire Groupe": "",
                 # "Type Operation": operation_label,
                 "Operation": row.get('Treatment', operation_label),
-                "VOLUME (T)": vol * 1, # Convertir en t
+                "VOLUME (T)": vol * 0.001, # Convertir en t
             })
 
         seen_months = set(monthly_volumes.keys())
@@ -4334,7 +4334,7 @@ class AnaplanMainApp:
                     "Partenaire Groupe": "",
                     # "Type Operation": operation_label,
                     "Operation": row.get('Treatment', operation_label),
-                    "VOLUME (T)": per_month * 1, # Convertir en t
+                    "VOLUME (T)": per_month * 0.001, # Convertir en t
                 })
 
         return rows
