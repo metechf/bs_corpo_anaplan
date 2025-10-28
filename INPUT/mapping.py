@@ -324,8 +324,8 @@ class AnaplanMapper:
             # Convertir en numérique d'abord, en remplaçant les virgules par des points
             df_mapped['VOLUME (T)'] = df_mapped['VOLUME (T)'].astype(str).str.replace(',', '.')
             df_mapped['VOLUME (T)'] = pd.to_numeric(df_mapped['VOLUME (T)'], errors='coerce').fillna(0)
-            # Multiplier par 1000 pour conversion en tonnes
-            df_mapped['VOLUME (T)'] = df_mapped['VOLUME (T)'] * 1000
+            # Multiplier par 1000 pour conversion en tonnes, UPDATE IL FAUT LAISSER LES VALEURS EN kt SELON LA NOUVELLE DE DEMANDE DE ZAKARIA
+            df_mapped['VOLUME (T)'] = df_mapped['VOLUME (T)'] * 1
             print(f"✅ Volumes multipliés par 1000 pour conversion en tonnes dans Ventes MP")
         
         # Normaliser les noms de colonnes (enlever les accents)
@@ -544,8 +544,10 @@ class AnaplanMapper:
             try:
 
                 df_prod = pd.read_excel(ppv_production_file)
+                # Remove "_source" de "PPV Production Mapped"
+                df_prod.drop(columns=['_source'], inplace=True)
+                # Map data
                 df_prod_mapped = self.map_ppv_production(df_prod)
-                
                 # Sauvegarder en Excel avec couleurs + CSV
                 excel_file = self.save_to_excel_with_colors(df_prod_mapped, ppv_production_file, "PPV_Production_mapped.xlsx")
                 csv_file = self.save_to_csv(df_prod_mapped, "PPV_Production_mapped.csv")
@@ -587,16 +589,26 @@ class AnaplanMapper:
 
                 df_ratios = pd.read_excel(ratios_matieres_file)
                 df_ratios_mapped = self.map_ratios_matieres_v2(df_ratios)
+
+                # Ratio MP with mean value
+                df_ratios_with_mean = pd.read_excel(ratios_matieres_file, sheet_name="Fichier Plat Ratios")
+                df_ratios_with_mean_mapped = self.map_ratios_matieres_v2(df_ratios_with_mean)
                 
                 # Sauvegarder en Excel avec couleurs + CSV
                 excel_file = self.save_to_excel_with_colors(df_ratios_mapped, ratios_matieres_file, "Ratios_Matieres_mapped.xlsx")
                 csv_file = self.save_to_csv(df_ratios_mapped, "Ratios_Matieres_mapped.csv")
-                
+
+                # Sauvegarder en Excel avec couleurs + CSV with mean value
+                excel_file_with_mean = self.save_to_excel_with_colors(df_ratios_with_mean_mapped, ratios_matieres_file, "Ratios_Moyen_Matieres_mapped.xlsx")
+                csv_file_with_mean = self.save_to_csv(df_ratios_with_mean_mapped, "Ratios_Moyen_Matieres_mapped.csv")
+
                 results['ratios_matieres'] = {
                     'original_rows': len(df_ratios),
                     'mapped_rows': len(df_ratios_mapped),
                     'excel_file': excel_file,
-                    'csv_file': csv_file
+                    'csv_file': csv_file,
+                    'excel_file_with_mean': excel_file_with_mean,
+                    'csv_file_with_mean': csv_file_with_mean
                 }
             except Exception as e:
                 print(f"❌ Erreur Ratios Matières: {e}")

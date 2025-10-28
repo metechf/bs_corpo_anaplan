@@ -761,7 +761,7 @@ class AnaplanMainApp:
                             if periode_type == "mois":
                                 # Volume mensuel direct
                                 mois_num = periode_value
-                                volume_mensuel = volume_value * 0.001  # Conversion Kt → T
+                                volume_mensuel = volume_value * 1  # Conversion Kt → T
                                 volumes_traites.append(mois_num)
 
                                 all_rows.append({
@@ -781,7 +781,7 @@ class AnaplanMainApp:
                             elif periode_type == "trimestre":
                                 # Répartir le volume trimestriel sur 3 mois
                                 trimestre = periode_value
-                                volume_mensuel = (volume_value * 0.001) / 3  # Conversion Kt → T et division par 3
+                                volume_mensuel = (volume_value * 1) / 3  # Conversion Kt → T et division par 3
 
                                 months = self.quarter_to_months[trimestre]
                                 for mois in months:
@@ -1087,7 +1087,7 @@ class AnaplanMainApp:
                             if periode_type == "mois":
                                 # Volume mensuel direct
                                 mois_num = periode_value
-                                volume_mensuel = volume_value * 0.001  # Conversion Kt → T
+                                volume_mensuel = volume_value * 1  # Conversion Kt → T
                                 volumes_traites.append(mois_num)
 
                                 all_rows.append({
@@ -1098,7 +1098,7 @@ class AnaplanMainApp:
                                     "Site/Entité": secteur_to_use,
                                     "Qualité": qualite_to_use,
                                     "Partenaire Groupe": "",
-                                    "Operation": "Extraction",
+                                    "Operation": "Epierrage-Criblage",
                                     "VOLUME (T)": volume_mensuel,
                                     "_source": sheet_name
                                 })
@@ -1107,7 +1107,7 @@ class AnaplanMainApp:
                             elif periode_type == "trimestre":
                                 # Répartir le volume trimestriel sur 3 mois
                                 trimestre = periode_value
-                                volume_mensuel = (volume_value * 0.001) / 3  # Conversion Kt → T et division par 3
+                                volume_mensuel = (volume_value * 1) / 3  # Conversion Kt → T et division par 3
 
                                 months = self.quarter_to_months[trimestre]
                                 for mois in months:
@@ -1120,7 +1120,7 @@ class AnaplanMainApp:
                                             "Site/Entité": secteur_to_use,
                                             "Qualité": qualite_to_use,
                                             "Partenaire Groupe": "",
-                                            "Operation": "Extraction",
+                                            "Operation": "Epierrage-Criblage",
                                             "VOLUME (T)": volume_mensuel,
                                             "_source": sheet_name
                                         })
@@ -1406,7 +1406,7 @@ class AnaplanMainApp:
                                     try:
                                         volume_value = float(row[col])
                                         if volume_value != 0:
-                                            volume_mensuel = volume_value * 0.001  # Kt → T
+                                            volume_mensuel = volume_value * 1  # Kt → T
                                             volumes_traites.append(mois_num)
 
                                             all_rows.append({
@@ -1435,7 +1435,7 @@ class AnaplanMainApp:
                                         try:
                                             volume_value = float(row[col])
                                             if volume_value != 0:
-                                                volume_mensuel = (volume_value * 0.001) / 3  # Kt → T / 3
+                                                volume_mensuel = (volume_value * 1) / 3  # Kt → T / 3
 
                                                 months = self.quarter_to_months[q]
                                                 for mois in months:
@@ -1523,6 +1523,938 @@ class AnaplanMainApp:
 
         return df_final, output.getvalue()
 
+    def generate_ppv_production_v5(self, ppv_file, uploaded_file, input_file, exercice: str, date_version):
+        """
+        Génère le DataFrame et l'Excel pour PPV Production V5.
+
+        CHANGEMENTS V5:
+        - Traitements Physiques : Source = PPV (Lavage + Séchage) au lieu de Summary Report + Yield
+        - Extraction, Chimique, Expédition : INCHANGÉS (code original v4)
+        """
+        xls = pd.ExcelFile(uploaded_file)
+        xls_ppv = pd.ExcelFile(ppv_file)
+        xls_input = pd.ExcelFile(input_file) if input_file else None
+        annee = pd.to_datetime(date_version).year
+        all_rows = []
+
+        # =========================================================================
+        # EXTRACTION - CODE ORIGINAL V4 (INCHANGÉ)
+        # =========================================================================
+        extraction_sheets = ["OIK", "OIB", "OIG"]
+        extraction_data_list = []
+
+        for sheet_name in extraction_sheets:
+            if sheet_name not in xls_ppv.sheet_names:
+                print(f"⚠️ Feuille {sheet_name} non trouvée, ignorée")
+                continue
+
+            try:
+                # Lire la feuille brute
+                raw_sheet = xls_ppv.parse(sheet_name, header=None)
+
+                # 1. NOUVEAU : Trouver la ligne avec "Volumes extraits" pour identifier les colonnes de périodes
+                periode_row_idx = None
+                periode_columns = {}  # {colonne_index: nom_periode}
+
+                for idx, row in raw_sheet.iterrows():
+                    # Chercher "Volumes extraits (tonnages equivalents SM)"
+                    if any("volumes extraits" in str(cell).lower() and "tonnages" in str(cell).lower()
+                           for cell in row if pd.notna(cell)):
+                        # La ligne suivante ou +1/+2 lignes contient les périodes
+                        # Vérifier les 3 prochaines lignes
+                        for offset in range(1, 4):
+                            if idx + offset < len(raw_sheet):
+                                potential_periode_row = raw_sheet.iloc[idx + offset]
+                                # Vérifier si cette ligne contient des noms de mois ou trimestres
+                                has_periode = any(
+                                    str(cell).lower().strip() in [
+                                        "janvier", "février", "fevrier", "mars", "avril", "mai", "juin",
+                                        "juillet", "août", "aout", "septembre", "octobre", "novembre",
+                                        "décembre", "decembre", "q1", "q2", "q3", "q4"
+                                    ] for cell in potential_periode_row if pd.notna(cell)
+                                )
+                                if has_periode:
+                                    periode_row_idx = idx + offset
+                                    print(
+                                        f"✅ Ligne des périodes trouvée dans {sheet_name} à la ligne {periode_row_idx}")
+
+                                    # Extraire le mapping colonne → période
+                                    month_mapping = {
+                                        "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+                                        "avril": 4, "mai": 5, "juin": 6,
+                                        "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+                                        "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+                                    }
+
+                                    for col_idx, cell_value in enumerate(potential_periode_row):
+                                        if pd.notna(cell_value):
+                                            cell_lower = str(cell_value).lower().strip()
+
+                                            # Vérifier si c'est un mois
+                                            for mois_name, mois_num in month_mapping.items():
+                                                if mois_name in cell_lower:
+                                                    periode_columns[col_idx] = ("mois", mois_num)
+                                                    print(f"   📅 Colonne {col_idx} = Mois {mois_num} ({cell_value})")
+                                                    break
+
+                                            # Vérifier si c'est un trimestre
+                                            cell_upper = str(cell_value).upper().strip()
+                                            if cell_upper in ["Q1", "Q2", "Q3", "Q4"]:
+                                                periode_columns[col_idx] = ("trimestre", cell_upper)
+                                                print(f"   📅 Colonne {col_idx} = Trimestre {cell_upper}")
+
+                                    break
+                        break
+
+                if not periode_columns:
+                    print(f"⚠️ Aucune colonne de période détectée dans {sheet_name}")
+                    continue
+
+                # 2. Trouver la section "Detail par qualite"
+                detail_start_idx = None
+                detail_end_idx = None
+
+                for idx, row in raw_sheet.iterrows():
+                    # Chercher "Detail par qualite"
+                    if any("detail par qualite" in str(cell).lower() for cell in row if pd.notna(cell)):
+                        detail_start_idx = idx
+                        print(f"✅ 'Detail par qualite' trouvé dans {sheet_name} à la ligne {idx}")
+                        continue
+
+                    # Chercher la fin (ligne "Lavage" ou "dont reprise")
+                    if detail_start_idx is not None and detail_end_idx is None:
+                        if any("lavage" in str(cell).lower() or "dont reprise" in str(cell).lower()
+                               for cell in row if pd.notna(cell)):
+                            detail_end_idx = idx
+                            print(f"🛑 Fin de section détectée dans {sheet_name} à la ligne {idx}")
+                            break
+
+                if detail_start_idx is None:
+                    print(f"⚠️ Section 'Detail par qualite' non trouvée dans {sheet_name}")
+                    continue
+
+                if detail_end_idx is None:
+                    detail_end_idx = len(raw_sheet)
+
+                # 3. Extraire la section "Detail par qualite"
+                detail_section = raw_sheet.iloc[detail_start_idx:detail_end_idx].copy()
+
+                # La première ligne après "Detail par qualite" contient les headers
+                headers_idx = 0
+                for idx in range(len(detail_section)):
+                    row = detail_section.iloc[idx]
+                    if any("secteur" in str(cell).lower() for cell in row if pd.notna(cell)):
+                        headers_idx = idx
+                        break
+
+                # Identifier la colonne "Secteur" et "Qualite"
+                headers_row = detail_section.iloc[headers_idx]
+                secteur_col_idx = None
+                qualite_col_idx = None
+
+                for col_idx, cell_value in enumerate(headers_row):
+                    if pd.notna(cell_value):
+                        cell_lower = str(cell_value).lower().strip()
+                        if "secteur" in cell_lower:
+                            secteur_col_idx = col_idx
+                        elif "qualite" in cell_lower or "qualité" in cell_lower:
+                            qualite_col_idx = col_idx
+
+                print(f"📋 Secteur colonne: {secteur_col_idx}, Qualite colonne: {qualite_col_idx}")
+
+                # 4. Traiter les données ligne par ligne
+                data_start_idx = headers_idx + 1
+                current_secteur = None
+
+                for row_idx in range(data_start_idx, len(detail_section)):
+                    row = detail_section.iloc[row_idx]
+
+                    # Vérifier si ligne vide complète
+                    if row.isna().all():
+                        continue
+
+                    # Récupérer Secteur et Qualité
+                    secteur_val = row.iloc[secteur_col_idx] if secteur_col_idx is not None else None
+                    qualite_val = row.iloc[qualite_col_idx] if qualite_col_idx is not None else None
+
+                    # Mettre à jour le secteur courant si non vide (forward-fill)
+                    if pd.notna(secteur_val) and str(secteur_val).strip() != "":
+                        current_secteur = str(secteur_val).strip()
+
+                    # Ignorer les lignes sans qualité
+                    if pd.isna(qualite_val) or str(qualite_val).strip() == "":
+                        continue
+
+                    # Utiliser le secteur courant
+                    secteur_to_use = current_secteur if current_secteur else ""
+                    qualite_to_use = str(qualite_val).strip()
+
+                    print(f"🔍 Traitement : Secteur='{secteur_to_use}' | Qualite='{qualite_to_use}'")
+
+                    # 5. Extraire les volumes en utilisant le mapping des périodes
+                    volumes_traites = []  # Pour éviter les doublons de mois
+
+                    # Parcourir les colonnes identifiées comme périodes
+                    for col_idx, (periode_type, periode_value) in periode_columns.items():
+                        if col_idx >= len(row):
+                            continue
+
+                        cell_value = row.iloc[col_idx]
+
+                        if pd.isna(cell_value) or cell_value == "" or cell_value == "-":
+                            continue
+
+                        try:
+                            volume_value = float(cell_value)
+
+                            if volume_value == 0:
+                                continue
+
+                            if periode_type == "mois":
+                                # Volume mensuel direct
+                                mois_num = periode_value
+                                volume_mensuel = volume_value * 1  # Conversion Kt → T
+                                volumes_traites.append(mois_num)
+
+                                all_rows.append({
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois_num,
+                                    "Site/Entité": secteur_to_use,
+                                    "Qualité": qualite_to_use,
+                                    "Partenaire Groupe": "",
+                                    "Operation": "Epierrage-Criblage",
+                                    "VOLUME (T)": volume_mensuel,
+                                    "_source": sheet_name
+                                })
+                                print(f"   ✅ Mois {mois_num} : {volume_mensuel} T")
+
+                            elif periode_type == "trimestre":
+                                # Répartir le volume trimestriel sur 3 mois
+                                trimestre = periode_value
+                                volume_mensuel = (volume_value * 1) / 3  # Conversion Kt → T et division par 3
+
+                                months = self.quarter_to_months[trimestre]
+                                for mois in months:
+                                    if mois not in volumes_traites:  # Éviter doublons
+                                        all_rows.append({
+                                            "Exercice": exercice,
+                                            "Date de la Version": str(date_version),
+                                            "Année": annee,
+                                            "Mois": mois,
+                                            "Site/Entité": secteur_to_use,
+                                            "Qualité": qualite_to_use,
+                                            "Partenaire Groupe": "",
+                                            "Operation": "Epierrage-Criblage",
+                                            "VOLUME (T)": volume_mensuel,
+                                            "_source": sheet_name
+                                        })
+                                        print(f"   ✅ {trimestre} → Mois {mois} : {volume_mensuel} T")
+
+                        except (ValueError, TypeError) as e:
+                            print(f"   ⚠️ Erreur conversion colonne {col_idx} : {e}")
+
+                # Sauvegarder la section pour export
+                extraction_data_list.append(detail_section.iloc[headers_idx:])
+                print(f"✅ {sheet_name} traité avec succès")
+
+            except Exception as e:
+                print(f"❌ Erreur traitement {sheet_name} : {e}")
+                import traceback
+                traceback.print_exc()
+
+        # =========================================================================
+        # TRAITEMENTS PHYSIQUES - NOUVELLE LOGIQUE V5 (LAVAGE + SÉCHAGE depuis PPV)
+        # =========================================================================
+        print("\n" + "=" * 80)
+        print("🔧 TRAITEMENT PHYSIQUE V5 - Lecture depuis PPV (Lavage + Séchage)")
+        print("=" * 80)
+
+        physical_df = pd.DataFrame()  # Pour export Excel
+
+        for sheet_name in extraction_sheets:
+            if sheet_name not in xls_ppv.sheet_names:
+                continue
+
+            try:
+                raw_sheet = xls_ppv.parse(sheet_name, header=None)
+                print(f"\n📖 Traitement feuille {sheet_name} pour Traitements Physiques")
+
+                # Traiter LAVAGE
+                lavage_rows = self._parse_lavage_ppv_v5(raw_sheet, sheet_name, exercice, date_version, annee)
+                all_rows.extend(lavage_rows)
+                print(f"   ✅ LAVAGE : {len(lavage_rows)} lignes ajoutées")
+
+                # Traiter SÉCHAGE
+                sechage_rows = self._parse_sechage_ppv_v5(raw_sheet, sheet_name, exercice, date_version, annee)
+                all_rows.extend(sechage_rows)
+                print(f"   ✅ SÉCHAGE : {len(sechage_rows)} lignes ajoutées")
+
+            except Exception as e:
+                print(f"❌ Erreur traitement Physique {sheet_name} : {e}")
+                import traceback
+                traceback.print_exc()
+
+        print("=" * 80)
+        print("✅ TRAITEMENT PHYSIQUE V5 - Terminé")
+        print("=" * 80 + "\n")
+
+        # =========================================================================
+        # TRAITEMENTS CHIMIQUES - CODE ORIGINAL V4 (INCHANGÉ)
+        # =========================================================================
+        chemical_sheet = next((s for s in xls.sheet_names if "chemical" in s.lower() or "chimique" in s.lower()), None)
+        chemical_df = pd.DataFrame()
+        if chemical_sheet:
+            chemical_df = self.extraire_table_par_nom(xls.parse(chemical_sheet, header=None), "Production")
+
+            # Exclusion des produits pour traitments chimiques
+            try:
+                exclusion_df = self.extraire_table_par_nom(xls.parse(chemical_sheet, header=None),
+                                                           "Production_Exclusion")
+                if not exclusion_df.empty and 'Product' in exclusion_df.columns:
+                    excluded_products = exclusion_df['Product'].dropna().tolist()
+                    chemical_df = chemical_df[~chemical_df['Product'].isin(excluded_products)]
+                    print(f" Produits exclus (Chemical) : {excluded_products}")
+            except:
+                pass
+
+        for _, row in chemical_df.iterrows():
+            all_rows.extend(
+                self._process_volume_row(
+                    row,
+                    prefix="Production",
+                    site_field="Entity",
+                    qual_field="Product",
+                    operation_label="Traitements Chimiques",
+                    exercice=exercice,
+                    date_version=date_version,
+                    annee=annee,
+                )
+            )
+
+        # =========================================================================
+        # EXPÉDITION - CODE ORIGINAL V4 (INCHANGÉ)
+        # =========================================================================
+        print("\n" + "=" * 80)
+        print("📦 EXPÉDITION - Début du processus")
+        print("=" * 80)
+
+        connexions_sheet = "Connexions"
+        expedition_df = pd.DataFrame()
+
+        if connexions_sheet in xls.sheet_names:
+            try:
+                connexions_raw = xls.parse(connexions_sheet, header=None)
+                flow_df = self.extraire_table_par_nom(connexions_raw, "Flow")
+
+                # Filtrer sur Connexion contenant "Expedition"
+                if not flow_df.empty and 'Connexion' in flow_df.columns:
+                    expedition_df = flow_df[
+                        flow_df['Connexion'].str.contains('Expedition', case=False, na=False)
+                    ].copy()
+
+                    print(f"✅ Table #Flow : {len(flow_df)} lignes")
+                    print(f"✅ Filtre 'Expedition' : {len(expedition_df)} lignes retenues")
+
+                    # Identifier colonnes de volumes Flow[...]
+                    flow_volume_cols = [col for col in expedition_df.columns if col.startswith('Flow[')]
+                    print(f"📊 Colonnes Flow détectées : {flow_volume_cols}")
+
+                    # Mapping des mois/trimestres
+                    month_mapping = {
+                        "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+                        "avril": 4, "mai": 5, "juin": 6,
+                        "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+                        "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+                    }
+
+                    for idx, row in expedition_df.iterrows():
+                        origin = row.get('Origin', '')
+                        product = row.get('Product', '')
+                        destination = row.get('Destination', '')
+                        year = row.get('Year', annee)
+
+                        volumes_traites = []
+
+                        # 1. Colonnes mensuelles
+                        for col in flow_volume_cols:
+                            col_lower = str(col).lower().strip()
+
+                            # Extraire le nom entre crochets
+                            if '[' in col and ']' in col:
+                                period_name = col.split('[')[1].split(']')[0].lower().strip()
+
+                                # Vérifier si c'est un mois
+                                mois_num = None
+                                for mois_name, mois_n in month_mapping.items():
+                                    if mois_name in period_name:
+                                        mois_num = mois_n
+                                        break
+
+                                if mois_num and pd.notna(row[col]):
+                                    try:
+                                        volume_value = float(row[col])
+                                        if volume_value != 0:
+                                            volume_mensuel = volume_value * 1  # Kt → T
+                                            volumes_traites.append(mois_num)
+
+                                            all_rows.append({
+                                                "Exercice": exercice,
+                                                "Date de la Version": str(date_version),
+                                                "Année": year,
+                                                "Mois": mois_num,
+                                                "Site/Entité": origin,
+                                                "Qualité": product,
+                                                "Partenaire Groupe": destination,
+                                                "Operation": "Expedition",
+                                                "VOLUME (T)": volume_mensuel,
+                                                "_source": "Flow_Expedition"
+                                            })
+                                    except (ValueError, TypeError):
+                                        pass
+
+                        # 2. Colonnes trimestrielles (pour mois non couverts)
+                        for col in flow_volume_cols:
+                            col_upper = str(col).upper().strip()
+
+                            if 'Q1' in col_upper or 'Q2' in col_upper or 'Q3' in col_upper or 'Q4' in col_upper:
+                                # Extraire Q1/Q2/Q3/Q4
+                                for q in ["Q1", "Q2", "Q3", "Q4"]:
+                                    if q in col_upper and pd.notna(row[col]):
+                                        try:
+                                            volume_value = float(row[col])
+                                            if volume_value != 0:
+                                                volume_mensuel = (volume_value * 1) / 3  # Kt → T / 3
+
+                                                months = self.quarter_to_months[q]
+                                                for mois in months:
+                                                    if mois not in volumes_traites:
+                                                        all_rows.append({
+                                                            "Exercice": exercice,
+                                                            "Date de la Version": str(date_version),
+                                                            "Année": year,
+                                                            "Mois": mois,
+                                                            "Site/Entité": origin,
+                                                            "Qualité": product,
+                                                            "Partenaire Groupe": destination,
+                                                            "Operation": "Expedition",
+                                                            "VOLUME (T)": volume_mensuel,
+                                                            "_source": "Flow_Expedition"
+                                                        })
+                                        except (ValueError, TypeError):
+                                            pass
+                                        break
+
+                    print(f"✅ Expédition traitée : lignes ajoutées à all_rows")
+                else:
+                    print("⚠️ Colonne 'Connexion' non trouvée dans #Flow")
+
+            except Exception as e:
+                print(f"❌ Erreur traitement Expédition : {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("⚠️ Feuille 'Connexions' non trouvée")
+
+        print("=" * 80)
+        print("✅ EXPÉDITION - Terminé")
+        print("=" * 80 + "\n")
+
+        # =========================================================================
+        # GÉNÉRATION EXCEL - CODE ORIGINAL V4 (INCHANGÉ)
+        # =========================================================================
+        if not all_rows:
+            st.error("Aucune donnée trouvée pour PPV Production.")
+            return pd.DataFrame(), b""
+
+        df_final = pd.DataFrame(all_rows)
+        df_final.insert(0, "#ID", [f"#{i + 1}" for i in range(len(df_final))])
+
+        # Export Excel avec feuilles séparées pour chaque table source
+        print("📊 Génération fichier Excel PPV Production...")
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            # Feuille 1: Fichier plat (avec formatage coloré)
+            df_final.to_excel(writer, index=False, sheet_name="Fichier plat PPV Production")
+            workbook = writer.book
+            worksheet = writer.sheets["Fichier plat PPV Production"]
+            format_extraction = workbook.add_format({"bg_color": "#E8F4FD"})
+            format_physical = workbook.add_format({"bg_color": "#E8F5E8"})
+            format_chemical = workbook.add_format({"bg_color": "#FFF8E1"})
+
+            # Feuilles des tables sources
+            for i, extraction_source_df in enumerate(extraction_data_list):
+                if not extraction_source_df.empty:
+                    sheet_name = f"Extraction_{extraction_sheets[i]}"
+                    extraction_source_df.to_excel(writer, index=False, sheet_name=sheet_name)
+                    print(f"✅ Table source : {sheet_name} ({len(extraction_source_df)} lignes)")
+
+            if not physical_df.empty:
+                physical_df.to_excel(writer, index=False, sheet_name="VolumeOutputProduct")
+                print(f"✅ Table source : VolumeOutputProduct ({len(physical_df)} lignes)")
+
+            if not chemical_df.empty:
+                chemical_df.to_excel(writer, index=False, sheet_name="Production")
+                print(f"✅ Table source : Production ({len(chemical_df)} lignes)")
+
+            # Coloration des onglets selon le type d'opération
+            tab_color_map = {
+                "Extraction_OIK": "#E8F4FD",
+                "Extraction_OIB": "#E8F4FD",
+                "Extraction_OIG": "#E8F4FD",
+                "VolumeOutputProduct": "#E8F5E8",
+                "Production": "#FFF8E1",
+            }
+            for sheet_name, color in tab_color_map.items():
+                if sheet_name in writer.sheets:
+                    writer.sheets[sheet_name].set_tab_color(color)
+
+        return df_final, output.getvalue()
+
+    def _parse_lavage_ppv_v5(self, raw_sheet, sheet_name, exercice, date_version, annee):
+        """Parse LAVAGE avec MÊME logique que Extraction pour les périodes."""
+        print(f"   🔧 Parsing LAVAGE dans {sheet_name}")
+
+        lavage_rows = []
+
+        # 1. Trouver "Quantites par laverie, par procede de traitement et par qualite source"
+        table_start_idx = None
+        site_entite = None
+        for idx, row in raw_sheet.iterrows():
+            cell_val = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+            if "quantites par laverie" in cell_val or "quantités par laverie" in cell_val:
+                table_start_idx = idx
+                print(f"      ✅ Table LAVAGE trouvée ligne {idx}")
+                break
+
+        if table_start_idx is None:
+            print(f"      ⚠️ Table LAVAGE non trouvée dans {sheet_name}")
+            return []
+
+        # 2. Trouver l'en-tête avec "Tonnages" (MÊME logique que Extraction)
+        periode_row_idx = None
+        for offset in range(-15, 10):  # Chercher avant et après table_start_idx
+            check_idx = table_start_idx + offset
+            if check_idx < 0 or check_idx >= len(raw_sheet):
+                continue
+
+            row = raw_sheet.iloc[check_idx]
+            if any("tonnages" in str(cell).lower() or "quantites en entree" in str(cell).lower()
+                   for cell in row if pd.notna(cell)):
+                periode_row_idx = check_idx
+                print(f"      ✅ En-tête périodes LAVAGE trouvé ligne {periode_row_idx}")
+                break
+
+        if periode_row_idx is None:
+            print(f"      ⚠️ En-tête périodes LAVAGE non trouvé")
+            return []
+
+        # 3. Extraire périodes (MÊME logique que Extraction)
+        periode_row = raw_sheet.iloc[periode_row_idx + 1]
+        periode_columns = {}
+
+        month_mapping = {
+            "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+            "avril": 4, "mai": 5, "juin": 6,
+            "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+            "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+        }
+
+        for col_idx, cell_value in enumerate(periode_row):
+            if pd.isna(cell_value):
+                continue
+
+            cell_lower = str(cell_value).lower().strip()
+
+            # Mois
+            for mois_name, mois_num in month_mapping.items():
+                if mois_name in cell_lower:
+                    periode_columns[col_idx] = ("mois", mois_num)
+                    print(f"         Colonne {col_idx} = Mois {mois_num}")
+                    break
+
+            # Trimestre
+            cell_upper = str(cell_value).upper().strip()
+            if cell_upper in ["Q1", "Q2", "Q3", "Q4"]:
+                periode_columns[col_idx] = ("trimestre", cell_upper)
+                print(f"         Colonne {col_idx} = Trimestre {cell_upper}")
+
+        if not periode_columns:
+            print(f"      ⚠️ Aucune période détectée pour LAVAGE")
+            return []
+
+        # 4. Parser les données (après table_start_idx)
+        current_operation = None
+
+        for row_idx in range(table_start_idx + 2, len(raw_sheet)):
+            row = raw_sheet.iloc[row_idx]
+
+            # Colonne 1 (index 0) = Opération ou Site
+            col_a = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+
+            # Fin de table si section suivante
+            if "sechage" in col_a or "séchage" in col_a or "expedition" in col_a:
+                break
+
+            # Détecter nouvelle opération (contient "lavage")
+            if "lavage" in col_a:
+                current_operation = str(row.iloc[1]).strip()
+                print(f"         Opération détectée: {current_operation}")
+                continue
+
+            # Colonne 2 (index 1) = Site/Secteur, Colonne 4 (index 3) = Qualité
+            site_entite_tmp = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+            site_entite = site_entite_tmp if site_entite_tmp != "" else site_entite
+            qualite = str(row.iloc[3]).strip() if len(row) > 3 and pd.notna(row.iloc[3]) else ""
+
+            if not qualite or not current_operation:
+                continue
+
+            # si la qualité existe et le site_entite non, on récupère l'ancien site_entite non vide
+
+            # Extraire volumes avec MÊME logique que Extraction
+            volumes_traites = []
+
+            for col_idx, (periode_type, periode_value) in periode_columns.items():
+                if col_idx >= len(row):
+                    continue
+
+                cell_value = row.iloc[col_idx]
+                if pd.isna(cell_value) or cell_value == "" or cell_value == "-":
+                    continue
+
+                try:
+                    volume_value = float(cell_value)
+                    if volume_value == 0:
+                        continue
+
+                    if periode_type == "mois":
+                        volume_mensuel = volume_value * 1  # PAS de conversion (déjà en T)
+                        volumes_traites.append(periode_value)
+
+                        lavage_rows.append({
+                            "Exercice": exercice,
+                            "Date de la Version": str(date_version),
+                            "Année": annee,
+                            "Mois": periode_value,
+                            "Site/Entité": site_entite,
+                            "Qualité": qualite,
+                            "Partenaire Groupe": "",
+                            "Operation": current_operation,
+                            "VOLUME (T)": volume_mensuel,
+                            "_source": f"{sheet_name}_Lavage"
+                        })
+
+                    elif periode_type == "trimestre":
+                        volume_mensuel = (volume_value * 1) / 3
+                        months = self.quarter_to_months[periode_value]
+                        for mois in months:
+                            if mois not in volumes_traites:
+                                lavage_rows.append({
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois,
+                                    "Site/Entité": site_entite,
+                                    "Qualité": qualite,
+                                    "Partenaire Groupe": "",
+                                    "Operation": current_operation,
+                                    "VOLUME (T)": volume_mensuel,
+                                    "_source": f"{sheet_name}_Lavage"
+                                })
+
+                except (ValueError, TypeError):
+                    continue
+
+        return lavage_rows
+
+    def _parse_sechage_ppv_v5(self, raw_sheet, sheet_name, exercice, date_version, annee):
+        """Parse SÉCHAGE avec MÊME logique que Extraction pour les périodes."""
+        print(f"   🌡️ Parsing SÉCHAGE dans {sheet_name}")
+
+        # Chercher "TOTAL par QM" d'abord
+        qm_idx = None
+        for idx, row in raw_sheet.iterrows():
+            cell_val = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+            if "total par qm" in cell_val:
+                qm_idx = idx
+                print(f"      ✅ Table 'TOTAL par QM' trouvée ligne {idx}")
+                break
+
+        # Vérifier si "TOTAL par QM" est remplie
+        use_qm = False
+        if qm_idx is not None:
+            for check_idx in range(qm_idx + 1, min(qm_idx + 10, len(raw_sheet))):
+                check_row = raw_sheet.iloc[check_idx]
+                check_val = str(check_row.iloc[1]).lower().strip() if pd.notna(check_row.iloc[1]) else ""
+
+                # Fin de section
+                if "expedition" in check_val or "prechauffage" in check_val or "chargement" in check_val:
+                    break
+
+                # Vérifier si ligne de données (colonne B non vide)
+                if len(check_row) > 1 and pd.notna(check_row.iloc[1]) and str(check_row.iloc[1]).strip():
+                    use_qm = True
+                    break
+
+        if use_qm:
+            print(f"      → Utilisation 'TOTAL par QM'")
+            return self._parse_qm_table_v5(raw_sheet, sheet_name, exercice, date_version, annee)
+        else:
+            print(f"      → 'TOTAL par QM' vide, utilisation 'TOTAL seche par unite'")
+            return self._parse_seche_unite_v5(raw_sheet, sheet_name, exercice, date_version, annee)
+
+    def _parse_qm_table_v5(self, raw_sheet, sheet_name, exercice, date_version, annee):
+        """Parse 'TOTAL par QM' avec MÊME logique de périodes."""
+        qm_rows = []
+
+        # 1. Trouver "TOTAL par QM"
+        table_idx = None
+        for idx, row in raw_sheet.iterrows():
+            cell_val = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+            if "total par qm" in cell_val:
+                table_idx = idx
+                break
+
+        if table_idx is None:
+            return []
+
+        # 2. Trouver l'en-tête avec "Tonnages" (MÊME logique)
+        periode_row_idx = None
+        for offset in range(-15, 10):
+            check_idx = table_idx + offset
+            if check_idx < 0 or check_idx >= len(raw_sheet):
+                continue
+
+            row = raw_sheet.iloc[check_idx]
+            if any("tonnages" in str(cell).lower() or "quantites en entree" in str(cell).lower()
+                   for cell in row if pd.notna(cell)):
+                periode_row_idx = check_idx
+                break
+
+        if periode_row_idx is None:
+            return []
+
+        # 3. Extraire périodes
+        periode_row = raw_sheet.iloc[periode_row_idx + 1]
+        periode_columns = {}
+
+        month_mapping = {
+            "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+            "avril": 4, "mai": 5, "juin": 6,
+            "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+            "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+        }
+
+        for col_idx, cell_value in enumerate(periode_row):
+            if pd.isna(cell_value):
+                continue
+
+            cell_lower = str(cell_value).lower().strip()
+            for mois_name, mois_num in month_mapping.items():
+                if mois_name in cell_lower:
+                    periode_columns[col_idx] = ("mois", mois_num)
+                    break
+
+            cell_upper = str(cell_value).upper().strip()
+            if cell_upper in ["Q1", "Q2", "Q3", "Q4"]:
+                periode_columns[col_idx] = ("trimestre", cell_upper)
+
+        # 4. Parser données
+        for row_idx in range(table_idx + 1, len(raw_sheet)):
+            row = raw_sheet.iloc[row_idx]
+
+            col_a = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+            if not col_a or "expedition" in col_a or "prechauffage" in col_a or "chargement" in col_a:
+                break
+
+            # Colonnes : B=Site, C=Operation, D=Qualité
+            site_entite = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+            operation = str(row.iloc[2]).strip() if len(row) > 2 and pd.notna(row.iloc[2]) else ""
+            qualite = str(row.iloc[3]).strip() if len(row) > 3 and pd.notna(row.iloc[3]) else ""
+
+            if not site_entite or not operation:
+                continue
+
+            # Extraire volumes
+            volumes_traites = []
+            for col_idx, (periode_type, periode_value) in periode_columns.items():
+                if col_idx >= len(row):
+                    continue
+
+                cell_value = row.iloc[col_idx]
+                if pd.isna(cell_value) or cell_value == "" or cell_value == "-":
+                    continue
+
+                try:
+                    volume_value = float(cell_value)
+                    if volume_value == 0:
+                        continue
+
+                    if periode_type == "mois":
+                        qm_rows.append({
+                            "Exercice": exercice,
+                            "Date de la Version": str(date_version),
+                            "Année": annee,
+                            "Mois": periode_value,
+                            "Site/Entité": site_entite,
+                            "Qualité": qualite,
+                            "Partenaire Groupe": "",
+                            "Operation": operation,
+                            "VOLUME (T)": volume_value * 1,
+                            "_source": f"{sheet_name}_Sechage_QM"
+                        })
+                        volumes_traites.append(periode_value)
+
+                    elif periode_type == "trimestre":
+                        volume_per_month = (volume_value * 1) / 3
+                        months = self.quarter_to_months[periode_value]
+                        for mois in months:
+                            if mois not in volumes_traites:
+                                qm_rows.append({
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois,
+                                    "Site/Entité": site_entite,
+                                    "Qualité": qualite,
+                                    "Partenaire Groupe": "",
+                                    "Operation": operation,
+                                    "VOLUME (T)": volume_per_month,
+                                    "_source": f"{sheet_name}_Sechage_QM"
+                                })
+
+                except (ValueError, TypeError):
+                    continue
+
+        return qm_rows
+
+    def _parse_seche_unite_v5(self, raw_sheet, sheet_name, exercice, date_version, annee):
+        """Parse 'TOTAL seche par unite' avec MÊME logique de périodes."""
+        seche_rows = []
+
+        # 1. Trouver "TOTAL seche par unite de sechage"
+        table_idx = None
+        for idx, row in raw_sheet.iterrows():
+            cell_val = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+            if "total seche par unite" in cell_val:
+                table_idx = idx
+                print(f"      ✅ Table 'TOTAL seche par unite' trouvée ligne {idx}")
+                break
+
+        if table_idx is None:
+            print(f"      ⚠️ Table 'TOTAL seche par unite' non trouvée")
+            return []
+
+        # 2. Trouver l'en-tête avec "Tonnages"
+        periode_row_idx = None
+        for offset in range(-15, 10):
+            check_idx = table_idx + offset
+            if check_idx < 0 or check_idx >= len(raw_sheet):
+                continue
+
+            row = raw_sheet.iloc[check_idx]
+            if any("tonnages" in str(cell).lower() or "quantites en entree" in str(cell).lower()
+                   for cell in row if pd.notna(cell)):
+                periode_row_idx = check_idx
+                break
+
+        if periode_row_idx is None:
+            return []
+
+        # 3. Extraire périodes
+        periode_row = raw_sheet.iloc[periode_row_idx + 1]
+        periode_columns = {}
+
+        month_mapping = {
+            "janvier": 1, "février": 2, "fevrier": 2, "mars": 3,
+            "avril": 4, "mai": 5, "juin": 6,
+            "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+            "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12
+        }
+
+        for col_idx, cell_value in enumerate(periode_row):
+            if pd.isna(cell_value):
+                continue
+
+            cell_lower = str(cell_value).lower().strip()
+            for mois_name, mois_num in month_mapping.items():
+                if mois_name in cell_lower:
+                    periode_columns[col_idx] = ("mois", mois_num)
+                    break
+
+            cell_upper = str(cell_value).upper().strip()
+            if cell_upper in ["Q1", "Q2", "Q3", "Q4"]:
+                periode_columns[col_idx] = ("trimestre", cell_upper)
+
+        # 4. Parser données (après table_idx)
+        for row_idx in range(table_idx + 1, len(raw_sheet)):
+            row = raw_sheet.iloc[row_idx]
+
+            col_a = str(row.iloc[1]).lower().strip() if pd.notna(row.iloc[1]) else ""
+            if not col_a or "quantites non" in col_a or "expedition" in col_a or "prechauffage" in col_a:
+                break
+
+            # Colonne B = Site/Entité
+            site_entite = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+
+            if not site_entite:
+                continue
+
+            # Extraire volumes
+            volumes_traites = []
+            for col_idx, (periode_type, periode_value) in periode_columns.items():
+                if col_idx >= len(raw_sheet.iloc[0]):
+                    continue
+
+                cell_value = row.iloc[col_idx]
+                if pd.isna(cell_value) or cell_value == "" or cell_value == "-":
+                    continue
+
+                try:
+                    volume_value = float(cell_value)
+                    if volume_value == 0:
+                        continue
+
+                    if periode_type == "mois":
+                        seche_rows.append({
+                            "Exercice": exercice,
+                            "Date de la Version": str(date_version),
+                            "Année": annee,
+                            "Mois": periode_value,
+                            "Site/Entité": site_entite,
+                            "Qualité": "",  # Vide pour cette table
+                            "Partenaire Groupe": "",
+                            "Operation": "Sechage",
+                            "VOLUME (T)": volume_value * 1,
+                            "_source": f"{sheet_name}_Sechage_Unite"
+                        })
+                        volumes_traites.append(periode_value)
+
+                    elif periode_type == "trimestre":
+                        volume_per_month = (volume_value * 1) / 3
+                        months = self.quarter_to_months[periode_value]
+                        for mois in months:
+                            if mois not in volumes_traites:
+                                seche_rows.append({
+                                    "Exercice": exercice,
+                                    "Date de la Version": str(date_version),
+                                    "Année": annee,
+                                    "Mois": mois,
+                                    "Site/Entité": site_entite,
+                                    "Qualité": "",
+                                    "Partenaire Groupe": "",
+                                    "Operation": "Sechage",
+                                    "VOLUME (T)": volume_per_month,
+                                    "_source": f"{sheet_name}_Sechage_Unite"
+                                })
+
+                except (ValueError, TypeError):
+                    continue
+
+        return seche_rows
 
     # ---------------------------------------------------------------------------
     # Module 2: Ventes & Matières Premières
@@ -1761,7 +2693,7 @@ class AnaplanMainApp:
                                     "Pays": pays,
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1804,7 +2736,7 @@ class AnaplanMainApp:
                                     "Pays": pays,
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                     "PRIX FOB": prix_fob_mois,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1902,7 +2834,7 @@ class AnaplanMainApp:
                                     "Pays": "Maroc",
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -1945,7 +2877,7 @@ class AnaplanMainApp:
                                     "Pays": "Maroc",
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                     "PRIX FOB": prix_fob_mois,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -2021,7 +2953,7 @@ class AnaplanMainApp:
                                 "Pays": "Maroc",
                                 "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                 "PRIX FOB": prix_fob,
                                 "Prix Fret": "",
                                 "Prix Frais d'approche MP": "",
@@ -2108,7 +3040,7 @@ class AnaplanMainApp:
                                         "Pays": "Maroc",
                                         "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                        "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                        "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                         "PRIX FOB": prix_fob,
                                         "Prix Fret": "",
                                         "Prix Frais d'approche MP": "",
@@ -2157,7 +3089,7 @@ class AnaplanMainApp:
                                     "Pays": "Maroc",
                                     "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                                    "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                                    "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                                     "PRIX FOB": prix_fob,
                                     "Prix Fret": "",
                                     "Prix Frais d'approche MP": "",
@@ -2200,7 +3132,7 @@ class AnaplanMainApp:
                             "Pays": "Maroc",
                             "Région": row.get("Region", ""),  # NOUVEAU
 "Devise": "USD",
-                            "VOLUME (T)": volume_mensuel * 0.001,  # Conversion kt → t
+                            "VOLUME (T)": volume_mensuel * 1,  # Conversion kt → t
                             "PRIX FOB": prix_fob,
                             "Prix Fret": "",
                             "Prix Frais d'approche MP": "",
@@ -2392,7 +3324,7 @@ class AnaplanMainApp:
                     volume_value = row[col]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 0.001  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 1  # MODIFIÉ: ajout *1000 (KT→T)
                             mois_num = None
                             for month_name, month_num in month_mapping.items():
                                 if month_name in str(col):
@@ -2432,7 +3364,7 @@ class AnaplanMainApp:
                     volume_value = row[volume_colonne]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 0.001 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 1 / 3  # MODIFIÉ: ajout *1000 (KT→T)
                         except (ValueError, TypeError):
                             continue
 
@@ -2505,7 +3437,7 @@ class AnaplanMainApp:
                     volume_value = row[col]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 0.001  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 1  # MODIFIÉ: ajout *1000 (KT→T)
                             mois_num = None
                             for month_name, month_num in month_mapping.items():
                                 if month_name in str(col):
@@ -2544,7 +3476,7 @@ class AnaplanMainApp:
                     volume_value = row[volume_colonne]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 0.001 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(volume_value) * 1 / 3  # MODIFIÉ: ajout *1000 (KT→T)
                         except (ValueError, TypeError):
                             continue
 
@@ -2620,7 +3552,7 @@ class AnaplanMainApp:
                     volume_value = row[col]
                     if pd.notna(volume_value):
                         try:
-                            volume_mensuel = float(volume_value) * 0.001
+                            volume_mensuel = float(volume_value) * 1
                             mois_num = None
                             for month_name, month_num in month_mapping.items():
                                 if month_name in str(col):
@@ -2669,7 +3601,7 @@ class AnaplanMainApp:
                 colname = f"Flow[{q}]"
                 if colname in row and pd.notna(row[colname]):
                     try:
-                        volume_mensuel = float(row[colname]) * 0.001 / 3
+                        volume_mensuel = float(row[colname]) * 1 / 3
                     except:
                         continue
 
@@ -2743,7 +3675,7 @@ class AnaplanMainApp:
                         volume_value = row[col]
                         if pd.notna(volume_value):
                             try:
-                                volume_mensuel = float(volume_value) * 0.001  # MODIFIÉ: ajout *1000 (KT→T)
+                                volume_mensuel = float(volume_value) * 1  # MODIFIÉ: ajout *1000 (KT→T)
                                 mois_num = None
                                 for month_name, month_num in month_mapping.items():
                                     if month_name in str(col):
@@ -2798,7 +3730,7 @@ class AnaplanMainApp:
                     colname = f"Flow[{q}]"  # MODIFIÉ: Flow[ au lieu de Volume[
                     if colname in row and pd.notna(row[colname]):
                         try:
-                            volume_mensuel = float(row[colname]) * 0.001 / 3  # MODIFIÉ: ajout *1000 (KT→T)
+                            volume_mensuel = float(row[colname]) * 1 / 3  # MODIFIÉ: ajout *1000 (KT→T)
                         except:
                             continue
 
@@ -2843,7 +3775,7 @@ class AnaplanMainApp:
                 volume_simple = row.get("Flow", 0)  # MODIFIÉ: Flow au lieu de Volume
                 if pd.notna(volume_simple):
                     try:
-                        volume_mensuel = float(volume_simple) * 0.001 / 12  # MODIFIÉ: ajout *1000 (KT→T)
+                        volume_mensuel = float(volume_simple) * 1 / 12  # MODIFIÉ: ajout *1000 (KT→T)
                     except:
                         volume_mensuel = ""
 
@@ -3930,7 +4862,7 @@ class AnaplanMainApp:
                     progress_bar.progress(0.2)
                     try:
 
-                        prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, input_file, exercice, date_version)
+                        prod_df, prod_bytes = self.generate_ppv_production_v5(ppv_file, summary_file, input_file, exercice, date_version)
                         if len(prod_df):
                             all_files["fichier_ppv_production.xlsx"] = prod_bytes
                     except Exception as e:
@@ -4081,7 +5013,7 @@ class AnaplanMainApp:
                             
                             # PPV Production
                             try:
-                                prod_df, prod_bytes = self.generate_ppv_production_v4(ppv_file, summary_file, input_file, exercice, date_version)
+                                prod_df, prod_bytes = self.generate_ppv_production_v5(ppv_file, summary_file, input_file, exercice, date_version)
                                 if len(prod_df):
                                     excel_filename = "fichier_ppv_production.xlsx"
                                     with open(excel_filename, 'wb') as f:
@@ -4313,7 +5245,7 @@ class AnaplanMainApp:
                 "Partenaire Groupe": "",
                 # "Type Operation": operation_label,
                 "Operation": row.get('Treatment', operation_label),
-                "VOLUME (T)": vol * 0.001, # Convertir en t
+                "VOLUME (T)": vol * 1, # Convertir en t
             })
 
         seen_months = set(monthly_volumes.keys())
@@ -4334,7 +5266,7 @@ class AnaplanMainApp:
                     "Partenaire Groupe": "",
                     # "Type Operation": operation_label,
                     "Operation": row.get('Treatment', operation_label),
-                    "VOLUME (T)": per_month * 0.001, # Convertir en t
+                    "VOLUME (T)": per_month * 1, # Convertir en t
                 })
 
         return rows
