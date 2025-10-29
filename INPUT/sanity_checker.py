@@ -11,7 +11,7 @@ import tempfile
 class AnaplanSanityChecker:
     """Classe pour effectuer les vérifications de cohérence sur le fichier de référence Anaplan-Ref.xlsx"""
     
-    def __init__(self, ref_file_path="FICHIERS ANAPLAN/Anaplan-Ref.xlsx", summary_file=None, ppv_file=None):
+    def __init__(self, ref_file_path="FICHIERS ANAPLAN/Anaplan-Ref_v1510.xlsx", summary_file=None, ppv_file=None):
         """Initialise le checker avec le chemin du fichier de référence et les fichiers uploadés par l'utilisateur."""
         self.ref_file_path = ref_file_path
         # Fichiers sources uploadés par l'utilisateur
@@ -57,6 +57,10 @@ class AnaplanSanityChecker:
             'Opération': {
                 'code_col': 'Code Opération',
                 'libelle_col': 'Opération'
+            },
+            'SiteEntité_Prod': {
+                'code_col': 'code SAP_2',
+                'libelle_col': 'Site/Entité#Qualité'
             }
         }
         
@@ -66,7 +70,8 @@ class AnaplanSanityChecker:
                 'columns_to_check': {
                     'Site/Entité': 'SiteEntité',
                     'Qualité': 'Qualité', 
-                    'Opération': 'Opération'
+                    'Opération': 'Opération',
+                    'Site/Entité#Qualité': 'SiteEntité_Prod'
                 }
             },
             'fichier_ventes_mp.xlsx': {
@@ -648,7 +653,7 @@ class AnaplanSanityChecker:
                 except Exception as e:
                     print(f"[ERREUR] Erreur lors de la verification: {e}")
                     continue
-            
+
             # Résumé final
             print("\n" + "=" * 80)
             print("[RESUME] RESUMÉ DES VERIFICATIONS ANAPLAN-REF")
@@ -703,6 +708,24 @@ class AnaplanSanityChecker:
                 print(f"❌ Erreur SiteEntité_vente : {e}")
                 import traceback
                 traceback.print_exc()
+
+
+            # NEW – SiteEntité_Prod combinaisons manquantes
+            try:
+                print("🔍 DEBUG - Génération SiteEntité_Prod...")
+                siteentite_prod_df = self.check_siteentite_prod_coverage()
+                if siteentite_prod_df is not None and not siteentite_prod_df.empty:
+                    print(
+                        f"🔍 DEBUG - Ajout de la feuille SiteEntité_Prod avec {len(siteentite_prod_df)} problèmes")
+                    self.append_siteentite_prod_sheet("anaplan_ref_sanity_report.xlsx", siteentite_prod_df)
+                else:
+                    print(
+                        "ℹ️  Feuille 'SiteEntité_Prod Manquants' non générée : toutes les combinaisons sont valides")
+            except Exception as e:
+                print(f"❌ Erreur SiteEntité_Prod : {e}")
+                import traceback
+                traceback.print_exc()
+
 
             # Résumé global
             print("\n" + "=" * 80)
@@ -1295,6 +1318,92 @@ class AnaplanSanityChecker:
 
         return pd.DataFrame(records)
 
+    def check_siteentite_prod_coverage(self):
+        """Vérifie que toutes les combinaisons Site/Entité#Qualité du fichier PPV_Production
+        existent dans la feuille SiteEntité_Prod avec un code SAP_2 valide."""
+
+        print("\n[VERIFICATION] SiteEntite_Prod Coverage")
+        print("-" * 50)
+
+        results = []
+
+        # 1. Charger la table de référence SiteEntité_Prod
+        try:
+            ref_df = pd.read_excel(self.ref_file_path, sheet_name='SiteEntité_Prod')
+            print(f"[INFO] Table SiteEntite_Prod chargee: {len(ref_df)} lignes")
+        except Exception as e:
+            print(f"[ERREUR] Impossible de charger SiteEntite_Prod: {e}")
+            return None
+
+        # 2. Charger le fichier PPV_Production
+        if not os.path.exists('fichier_ppv_production.xlsx'):
+            print("[WARNING] fichier_ppv_production.xlsx non trouve")
+            return None
+
+        try:
+            ppv_df = pd.read_excel('fichier_ppv_production.xlsx', sheet_name='Fichier plat PPV Production')
+            print(f"[INFO] Fichier PPV_Production charge: {len(ppv_df)} lignes")
+        except Exception as e:
+            print(f"[ERREUR] Impossible de charger PPV_Production: {e}")
+            return None
+
+        # 3. Créer les combinaisons Site/Entité#Qualité depuis PPV_Production
+        ppv_df['Site/Entité#Qualité'] = ppv_df['Site/Entité'].astype(str) + '#' + ppv_df['Qualité'].astype(str)
+        combinaisons_ppv = set(ppv_df['Site/Entité#Qualité'].dropna().unique())
+
+        print(f"[INFO] {len(combinaisons_ppv)} combinaisons uniques dans PPV_Production")
+
+        # 4. Créer un dictionnaire de référence {combinaison: code_SAP_2}
+        ref_dict = {}
+        for _, row in ref_df.iterrows():
+            combo = str(row.get('Site/Entité#Qualité', ''))
+            code_sap2 = str(row.get('code SAP_2', '')).strip()
+            if combo and combo not in ['nan', 'NaN', '']:
+                ref_dict[combo] = code_sap2
+
+        print(f"[INFO] {len(ref_dict)} combinaisons dans SiteEntite_Prod")
+
+        # 5. Vérifier chaque combinaison
+        missing_count = 0
+        no_code_count = 0
+
+        for combo in sorted(combinaisons_ppv):
+            if combo in ['nan', 'NaN', '']:
+                continue
+
+            # Séparer Site/Entité et Qualité
+            parts = combo.split('#', 1)
+            site_entite = parts[0] if len(parts) > 0 else ''
+            qualite = parts[1] if len(parts) > 1 else ''
+
+            # Vérifier existence
+            if combo not in ref_dict:
+                results.append({
+                    'Site/Entité': site_entite,
+                    'Qualité': qualite,
+                    'Site/Entité#Qualité': combo,
+                    'Statut': 'MANQUANT',
+                    'code SAP_2': ''
+                })
+                missing_count += 1
+            elif ref_dict[combo] in ['', 'nan', 'NaN']:
+                results.append({
+                    'Site/Entité': site_entite,
+                    'Qualité': qualite,
+                    'Site/Entité#Qualité': combo,
+                    'Statut': 'SANS CODE SAP_2',
+                    'code SAP_2': ''
+                })
+                no_code_count += 1
+
+        print(f"[RESULTAT] {missing_count} combinaisons manquantes")
+        print(f"[RESULTAT] {no_code_count} combinaisons sans code SAP_2")
+
+        if results:
+            return pd.DataFrame(results)
+        else:
+            print("[OK] Toutes les combinaisons sont presentes avec code SAP_2 valide")
+            return None
 
     def analyze_site_entite_vente_missing_combinations(self):
         """Analyse les combinaisons Site#Qualité manquantes dans SiteEntité_vente."""
@@ -1433,6 +1542,92 @@ class AnaplanSanityChecker:
             
         except Exception as e:
             print(f"[ERREUR] Erreur ajout SiteEntite_vente: {e}")
+            return False
+
+    # def append_siteentite_prod_sheet(self, report_file, siteentite_prod_df):
+    #     """Ajoute une feuille avec les combinaisons SiteEntité_Prod manquantes au rapport."""
+    #     try:
+    #         with pd.ExcelWriter(report_file, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+    #             siteentite_prod_df.to_excel(writer, sheet_name='SiteEntité_Prod Manquants', index=False)
+    #             print(f"   [GENERE] Feuille 'SiteEntité_Prod Manquants' avec {len(siteentite_prod_df)} anomalies")
+    #     except Exception as e:
+    #         print(f"[ERREUR] Impossible d'ajouter la feuille SiteEntité_Prod: {e}")
+
+    def append_siteentite_prod_sheet(self, report_file, siteentite_prod_df):
+        """Ajoute une feuille avec les combinaisons SiteEntité_Prod manquantes au rapport."""
+        try:
+            from openpyxl import load_workbook
+            from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+
+            # Charger le workbook existant
+            wb = load_workbook(report_file)
+
+            # Supprimer la feuille si elle existe déjà
+            sheet_name = 'SiteEntité_Prod Manquants'
+            if sheet_name in wb.sheetnames:
+                del wb[sheet_name]
+
+            # Créer une nouvelle feuille
+            ws = wb.create_sheet(sheet_name)
+
+            # Styles (comme les autres fonctions)
+            header_fill = PatternFill(start_color='2E7D32', end_color='2E7D32', fill_type='solid')
+            title_fill = PatternFill(start_color='1976D2', end_color='1976D2', fill_type='solid')
+            rouge_fill = PatternFill(start_color='FFCDD2', end_color='FFCDD2', fill_type='solid')
+            white_font = Font(color='FFFFFF', bold=True)
+            center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            thin = Side(border_style="thin", color="000000")
+            border = Border(top=thin, left=thin, right=thin, bottom=thin)
+
+            # Titre fusionné
+            ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(siteentite_prod_df.columns))
+            cell_title = ws.cell(row=1, column=1,
+                                 value=f"SiteEntité_Prod Manquants - {len(siteentite_prod_df)} entrées")
+            cell_title.fill = title_fill
+            cell_title.font = white_font
+            cell_title.alignment = center_align
+            cell_title.border = border
+            ws.row_dimensions[1].height = 25
+
+            # En-têtes
+            for col_idx, header in enumerate(siteentite_prod_df.columns, start=1):
+                cell = ws.cell(row=2, column=col_idx, value=header)
+                cell.fill = header_fill
+                cell.font = white_font
+                cell.alignment = center_align
+                cell.border = border
+
+            # Données
+            for r_idx, (_, row) in enumerate(siteentite_prod_df.iterrows(), start=3):
+                for c_idx, column in enumerate(siteentite_prod_df.columns, start=1):
+                    val = row[column]
+                    cell = ws.cell(row=r_idx, column=c_idx, value=val)
+
+                    # Colorisation selon le statut
+                    if column == "Statut":
+                        if val == "MANQUANT":
+                            cell.fill = rouge_fill
+                        elif val == "SANS CODE SAP_2":
+                            cell.fill = PatternFill(start_color='FFE0B2', end_color='FFE0B2',
+                                                    fill_type='solid')  # Orange
+
+                    cell.border = border
+
+            # Largeurs des colonnes
+            for col_idx, column in enumerate(siteentite_prod_df.columns, start=1):
+                max_len = max(len(str(column)), 20)
+                ws.column_dimensions[chr(64 + col_idx)].width = max_len + 2
+
+            # Sauvegarder
+            wb.save(report_file)
+
+            print(f"   [GENERE] Feuille 'SiteEntité_Prod Manquants' avec {len(siteentite_prod_df)} anomalies")
+            return True
+
+        except Exception as e:
+            print(f"[ERREUR] Impossible d'ajouter la feuille SiteEntité_Prod: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def append_product_coverage_sheet(self, report_file, coverage_df):
